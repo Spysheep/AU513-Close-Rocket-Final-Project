@@ -4,7 +4,15 @@ from pydantic import BaseModel
 from database import Database
 
 app = FastAPI()
-db = Database()  # Instance de la base de données
+
+# Instance de la base de données (initialisée à la demande)
+db = None
+
+def get_db():
+    global db
+    if db is None:
+        db = Database()
+    return db
 
 # Configuration CORS pour permettre au frontend de communiquer avec le backend
 app.add_middleware(
@@ -30,7 +38,8 @@ def calculate(request: CalculateRequest):
     result = request.number ** 2
 
     # Sauvegarde dans la base de données
-    calculation_id = db.save_calculation(request.number, result)
+    database = get_db()
+    calculation_id = database.save_calculation(request.number, result)
 
     return {
         "id": calculation_id,
@@ -45,7 +54,8 @@ def get_history(limit: int = 10):
     Récupère l'historique des calculs
     Par défaut, retourne les 10 derniers calculs
     """
-    calculations = db.get_all_calculations(limit=limit)
+    database = get_db()
+    calculations = database.get_all_calculations(limit=limit)
     return {
         "count": len(calculations),
         "calculations": calculations
@@ -56,7 +66,8 @@ def get_calculation(calculation_id: int):
     """
     Récupère un calcul spécifique par son ID
     """
-    calculation = db.get_calculation_by_id(calculation_id)
+    database = get_db()
+    calculation = database.get_calculation_by_id(calculation_id)
     if calculation:
         return calculation
     return {"error": "Calcul non trouvé"}
@@ -66,7 +77,8 @@ def delete_calculation(calculation_id: int):
     """
     Supprime un calcul de l'historique
     """
-    success = db.delete_calculation(calculation_id)
+    database = get_db()
+    success = database.delete_calculation(calculation_id)
     if success:
         return {"message": "Calcul supprimé avec succès"}
     return {"error": "Calcul non trouvé"}
