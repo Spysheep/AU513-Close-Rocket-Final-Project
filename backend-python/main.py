@@ -1,9 +1,17 @@
 from fastapi import FastAPI
-import your_model
+from fastapi.middleware.cors import CORSMiddleware
+import test
 
 app = FastAPI()
 
-@app.get("/predict")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/api")
 def predict(x: float):
-    result = your_model.inference(x)
+    result = test.z  # provient de backend-python/test.py
     return {"prediction": result}
