@@ -4,11 +4,11 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout, BatchNormalization
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras.callbacks import ReduceLROnPlateau
-from tensorflow.keras.regularizers import l2
+from tf_keras.models import Sequential
+from tf_keras.layers import LSTM, Dense, Dropout, BatchNormalization
+from tf_keras.optimizers import Adam
+from tf_keras.callbacks import ReduceLROnPlateau
+from tf_keras.regularizers import l2
 import tensorflow as tf
 import tf2onnx
 import subprocess

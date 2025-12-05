@@ -3,8 +3,8 @@ import numpy as np
 import ast
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
+from tf_keras.models import Sequential
+from tf_keras.layers import LSTM, Dense, Dropout
 
 # --- 1. Configuration Parameters ---
 FILE_PATH = 'dataset_tensorflow.csv'
