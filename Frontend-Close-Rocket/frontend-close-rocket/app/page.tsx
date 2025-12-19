@@ -254,11 +254,91 @@ export default function Home() {
       
       <div className="min-h-screen bg-zinc-50 dark:bg-black py-10">
         <main className="mx-auto w-full max-w-6xl rounded-xl bg-white dark:bg-zinc-900 p-8 shadow">
-          <header className="mb-6 flex items-center justify-between">
-            <h1 className="text-2xl md:text-3xl font-bold text-black dark:text-white">Close Rocket — Input</h1>
-            <div className="text-xs text-zinc-500">Backend: http://localhost:8000</div>
+          <header className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h1 className="text-2xl md:text-3xl font-bold text-black dark:text-white">Close Rocket</h1>
+              <div className="text-xs text-zinc-500">Backend: http://localhost:8000</div>
+            </div>
+            
+            {/* Onglets */}
+            <div className="flex border-b border-zinc-200 dark:border-zinc-700">
+              <button
+                onClick={() => setActiveTab("input")}
+                className={`px-6 py-3 text-sm font-medium transition-colors ${
+                  activeTab === "input"
+                    ? "text-blue-600 border-b-2 border-blue-600"
+                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                }`}
+              >
+                📝 Nouvelle simulation
+              </button>
+              <button
+                onClick={() => setActiveTab("load")}
+                className={`px-6 py-3 text-sm font-medium transition-colors ${
+                  activeTab === "load"
+                    ? "text-blue-600 border-b-2 border-blue-600"
+                    : "text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
+                }`}
+              >
+                📂 Charger simulation
+              </button>
+            </div>
           </header>
 
+          {/* Contenu de l'onglet "Charger simulation" */}
+          {activeTab === "load" && (
+            <div className="py-8">
+              <div className="max-w-md mx-auto">
+                <h2 className="text-xl font-semibold text-black dark:text-white mb-4">
+                  Charger une simulation existante
+                </h2>
+                <p className="text-sm text-zinc-500 mb-6">
+                  Entrez l&apos;identifiant de la simulation (format: rocket_XXXX) pour charger les résultats depuis Supabase.
+                </p>
+                
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      ID de simulation
+                    </label>
+                    <input
+                      type="text"
+                      value={simulationId}
+                      onChange={(e) => setSimulationId(e.target.value)}
+                      placeholder="rocket_0001"
+                      className="px-4 py-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+                    />
+                  </div>
+                  
+                  {loadError && (
+                    <div className="p-3 rounded-md border border-red-300 bg-red-100 text-red-800 text-sm">
+                      {loadError}
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={handleLoadSimulation}
+                    className="w-full px-6 py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition-colors"
+                  >
+                    🚀 Charger la simulation
+                  </button>
+                </div>
+                
+                <div className="mt-8 p-4 rounded-lg bg-zinc-100 dark:bg-zinc-800">
+                  <h3 className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    💡 Astuce
+                  </h3>
+                  <p className="text-xs text-zinc-500">
+                    L&apos;ID de simulation est généré automatiquement lorsque vous créez une nouvelle simulation. 
+                    Vous pouvez le retrouver dans l&apos;URL de la page de résultats ou dans votre historique Supabase.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Contenu de l'onglet "Input" (formulaire existant) */}
+          {activeTab === "input" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left: form (two columns width) */}
           <div className="lg:col-span-2">
@@ -562,6 +642,7 @@ export default function Home() {
             </div>
           </aside>
         </div>
+        )}
       </main>
     </div>
     </>
