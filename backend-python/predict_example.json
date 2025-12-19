@@ -1,21 +1,35 @@
 {
-  "delay": 0.0,
-  "heading": 25.62,
-  "ramp_inclinaison": 86.86,
-  "motor_name": "Pro75M1670",
-  "radius": 0.133,
-  "mass": 8.29,
-  "inertia": "(9.7, 9.7, 0.009)",
-  "center_of_mass_without_motor": 2.14,
-  "cone_length": 0.41,
-  "rocket_length": 2.96,
-  "fin_cat": "trapezoidal",
-  "number_of_ailerons": 4,
-  "root_chord": 0.25,
-  "tip_chord": 0.18,
-  "span": 0.23,
-  "fins_pos": 0.09,
-  "fin_inclinaison": 0.0,
-  "drag_coeff": 1.07,
-  "trigger": "apogee"
+  "geometry": {
+    "coiffe": {
+      "shape_param": 0.5,
+      "diameter_mm": 60,
+      "length_mm": 150
+    },
+    "tube": {
+      "diameter_mm": 60,
+      "length_mm": 300
+    },
+    "aileron": {
+      "type": "trapezoidale",
+      "number": 3,
+      "inclination_deg": 0
+    }
+  },
+  "cg": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.2
+  },
+  "weight_kg": 1.5,
+  "thrust_N": 50.0,
+  "wind": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0,
+    "groundSpeed_kms": 0.0
+  },
+  "ramp_inclination": {
+    "theta_xy": 0.0,
+    "phi_xz": 85.0
+  }
 }

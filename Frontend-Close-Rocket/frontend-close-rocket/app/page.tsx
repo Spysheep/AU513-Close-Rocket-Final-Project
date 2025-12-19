@@ -123,7 +123,7 @@ export default function Home() {
         },
       };
 
-      const response = await fetch("http://localhost:8000/inputs", {
+      const response = await fetch("http://localhost:8000/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -142,21 +142,6 @@ export default function Home() {
       console.error(e);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    try {
-      const response = await fetch(`http://localhost:8000/history/${id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        // Rafraîchit l'historique après suppression
-        fetchHistory();
-      }
-    } catch (err) {
-      console.error('Erreur lors de la suppression:', err);
     }
   };
 

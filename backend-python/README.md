@@ -125,30 +125,44 @@ curl "http://localhost:8000/simulations?ids=rocket_0000,rocket_0001,rocket_0002"
 ---
 
 ### `POST /predict`
-Accepte les paramètres de fusée pour prédiction ML.
+Accepte les paramètres de fusée depuis le frontend pour prédiction ML.
 
 **Corps de la requête :**
 ```json
 {
-  "delay": 0.0,
-  "heading": 25.62,
-  "ramp_inclinaison": 86.86,
-  "motor_name": "Pro75M1670",
-  "radius": 0.133,
-  "mass": 8.29,
-  "inertia": "(9.7, 9.7, 0.009)",
-  "center_of_mass_without_motor": 2.14,
-  "cone_length": 0.41,
-  "rocket_length": 2.96,
-  "fin_cat": "trapezoidal",
-  "number_of_ailerons": 4,
-  "root_chord": 0.25,
-  "tip_chord": 0.18,
-  "span": 0.23,
-  "fins_pos": 0.09,
-  "fin_inclinaison": 0.0,
-  "drag_coeff": 1.07,
-  "trigger": "apogee"
+  "geometry": {
+    "coiffe": {
+      "shape_param": 0.5,
+      "diameter_mm": 60,
+      "length_mm": 150
+    },
+    "tube": {
+      "diameter_mm": 60,
+      "length_mm": 300
+    },
+    "aileron": {
+      "type": "trapezoidale",
+      "number": 3,
+      "inclination_deg": 0
+    }
+  },
+  "cg": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.2
+  },
+  "weight_kg": 1.5,
+  "thrust_N": 50.0,
+  "wind": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0,
+    "groundSpeed_kms": 0.0
+  },
+  "ramp_inclination": {
+    "theta_xy": 0.0,
+    "phi_xz": 85.0
+  }
 }
 ```
 
@@ -156,14 +170,14 @@ Accepte les paramètres de fusée pour prédiction ML.
 ```bash
 curl -X POST "http://localhost:8000/predict" \
   -H "Content-Type: application/json" \
-  -d @predict_request.json
+  -d @predict_example.json
 ```
 
 **Réponse :**
 ```json
 {
   "status": "success",
-  "message": "Paramètres de fusée reçus et validés. Modèle ML non encore implémenté.",
+  "message": "Paramètres de fusée reçus et validés. Géométrie: coiffe 0.5 (60mm × 150mm), tube 60mm × 300mm, 3 ailerons trapezoidale. Masse: 1.5kg, Poussée: 50.0N (T/W: 3.40). Modèle ML non encore implémenté.",
   "request_id": null
 }
 ```
@@ -173,11 +187,13 @@ curl -X POST "http://localhost:8000/predict" \
 - `422` : Erreur de validation (paramètres invalides)
 
 **Validations :**
-- `radius`, `mass`, `cone_length`, `rocket_length`, `root_chord`, `tip_chord`, `span`, `drag_coeff` : doivent être > 0
-- `heading`, `ramp_inclinaison` : doivent être entre 0 et 360°
-- `number_of_ailerons` : doit être entre 0 et 8
-- `fin_cat` : doit être `trapezoidal` ou `elyptique`
-- `trigger` : doit être `apogee`
+- `geometry.coiffe.shape_param` : doit être entre 0 et 1
+- `geometry.coiffe.diameter_mm`, `geometry.coiffe.length_mm` : doivent être > 0
+- `geometry.tube.diameter_mm`, `geometry.tube.length_mm` : doivent être > 0
+- `geometry.aileron.type` : doit être `trapezoidale`, `elliptique` ou `diamant`
+- `geometry.aileron.number` : doit être >= 3
+- `weight_kg`, `thrust_N` : doivent être > 0
+- `ramp_inclination.theta_xy`, `ramp_inclination.phi_xz` : doivent être entre -360 et 360°
 
 ---
 

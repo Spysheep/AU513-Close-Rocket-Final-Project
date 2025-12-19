@@ -123,53 +123,79 @@ class SimulationsResponse(BaseModel):
     simulations: List[SimulationResponse]
 
 
-class PredictRequest(BaseModel):
-    """Model for ML prediction request (all 20 rocket parameters)"""
-    delay: float
-    heading: float
-    ramp_inclinaison: float
-    motor_name: str
-    radius: float = Field(..., gt=0, description="Radius must be positive")
-    mass: float = Field(..., gt=0, description="Mass must be positive")
-    inertia: str
-    center_of_mass_without_motor: float
-    cone_length: float = Field(..., gt=0, description="Cone length must be positive")
-    rocket_length: float = Field(..., gt=0, description="Rocket length must be positive")
-    fin_cat: str
-    number_of_ailerons: int = Field(..., ge=0, le=8, description="Number of ailerons must be between 0 and 8")
-    root_chord: float = Field(..., gt=0, description="Root chord must be positive")
-    tip_chord: float = Field(..., gt=0, description="Tip chord must be positive")
-    span: float = Field(..., gt=0, description="Span must be positive")
-    fins_pos: float
-    fin_inclinaison: float
-    drag_coeff: float = Field(..., gt=0, description="Drag coefficient must be positive")
-    trigger: str
+class CoiffeGeometry(BaseModel):
+    """Model for nose cone geometry"""
+    shape_param: float = Field(..., ge=0, le=1, description="Shape parameter between 0 and 1")
+    diameter_mm: float = Field(..., gt=0, description="Diameter in mm")
+    length_mm: float = Field(..., gt=0, description="Length in mm")
 
-    @field_validator('heading', 'ramp_inclinaison')
+
+class TubeGeometry(BaseModel):
+    """Model for tube geometry"""
+    diameter_mm: float = Field(..., gt=0, description="Diameter in mm")
+    length_mm: float = Field(..., gt=0, description="Length in mm")
+
+
+class AileronGeometry(BaseModel):
+    """Model for fin geometry"""
+    type: str = Field(..., description="Fin type: trapezoidale, elliptique, or diamant")
+    number: int = Field(..., ge=3, description="Number of fins (minimum 3)")
+    inclination_deg: float = Field(default=0.0, description="Inclination angle in degrees")
+
+    @field_validator('type')
+    @classmethod
+    def validate_type(cls, v):
+        """Validate fin type is one of allowed values"""
+        allowed = ['trapezoidale', 'elliptique', 'diamant']
+        if v not in allowed:
+            raise ValueError(f'Fin type must be one of {allowed}')
+        return v
+
+
+class Geometry(BaseModel):
+    """Model for rocket geometry"""
+    coiffe: CoiffeGeometry
+    tube: TubeGeometry
+    aileron: AileronGeometry
+
+
+class CenterOfGravity(BaseModel):
+    """Model for center of gravity coordinates"""
+    x: float
+    y: float
+    z: float
+
+
+class Wind(BaseModel):
+    """Model for wind conditions"""
+    x: float
+    y: float
+    z: float
+    groundSpeed_kms: float = Field(..., description="Ground speed in km/s")
+
+
+class RampInclination(BaseModel):
+    """Model for launch ramp inclination"""
+    theta_xy: float = Field(..., description="Theta XY angle in degrees")
+    phi_xz: float = Field(..., description="Phi XZ angle in degrees")
+
+    @field_validator('theta_xy', 'phi_xz')
     @classmethod
     def validate_angle(cls, v):
-        """Validate angles are between 0 and 360 degrees"""
-        if not 0 <= v <= 360:
-            raise ValueError('Angle must be between 0 and 360 degrees')
+        """Validate angles are reasonable"""
+        if not -360 <= v <= 360:
+            raise ValueError('Angle must be between -360 and 360 degrees')
         return v
 
-    @field_validator('fin_cat')
-    @classmethod
-    def validate_fin_category(cls, v):
-        """Validate fin category is one of allowed values"""
-        allowed = ['trapezoidal', 'elyptique']
-        if v not in allowed:
-            raise ValueError(f'fin_cat must be one of {allowed}')
-        return v
 
-    @field_validator('trigger')
-    @classmethod
-    def validate_trigger(cls, v):
-        """Validate trigger is one of allowed values"""
-        allowed = ['apogee']
-        if v not in allowed:
-            raise ValueError(f'trigger must be one of {allowed}')
-        return v
+class PredictRequest(BaseModel):
+    """Model for ML prediction request from frontend"""
+    geometry: Geometry
+    cg: CenterOfGravity
+    weight_kg: float = Field(..., gt=0, description="Weight in kg")
+    thrust_N: float = Field(..., gt=0, description="Thrust in Newtons")
+    wind: Wind
+    ramp_inclination: RampInclination
 
 
 class PredictResponse(BaseModel):
@@ -281,33 +307,47 @@ async def get_simulations(ids: str = Query(..., description="Comma-separated roc
 @app.post("/predict", response_model=PredictResponse, tags=["Predictions"])
 async def predict_trajectory(request: PredictRequest):
     """
-    Accepte les paramètres de fusée pour prédiction ML (structure seulement)
+    Accepte les paramètres de fusée depuis le frontend pour prédiction ML
 
     Args:
-        request: Tous les 20 paramètres requis pour une simulation
+        request: Paramètres complets de la fusée (géométrie, cg, poids, poussée, vent, rampe)
 
     Returns:
-        Message de succès/échec
+        Message de succès avec résumé des paramètres
 
     Note:
         Le modèle ML n'est pas encore implémenté.
         Cet endpoint valide les données et retourne un accusé de réception.
 
     Future:
-        - Appeler service d'inférence ML
+        - Appeler service d'inférence ML (modèle deep learning)
         - Retourner trajectoire prédite
-        - Fournir scores de confiance
+        - Fournir scores de confiance et métriques
     """
-    logger.info(f"Received prediction request for motor: {request.motor_name}")
+    logger.info(f"Received prediction request - Fin type: {request.geometry.aileron.type}, Weight: {request.weight_kg} kg, Thrust: {request.thrust_N} N")
 
     # Log received parameters (for future ML training/analysis)
     logger.debug(f"Prediction parameters: {request.model_dump()}")
+
+    # Calculate thrust-to-weight ratio for validation feedback
+    thrust_to_weight = request.thrust_N / (request.weight_kg * 9.81)
+
+    # Build detailed summary message
+    summary_message = (
+        f"Paramètres de fusée reçus et validés. "
+        f"Géométrie: coiffe {request.geometry.coiffe.shape_param} "
+        f"({request.geometry.coiffe.diameter_mm}mm × {request.geometry.coiffe.length_mm}mm), "
+        f"tube {request.geometry.tube.diameter_mm}mm × {request.geometry.tube.length_mm}mm, "
+        f"{request.geometry.aileron.number} ailerons {request.geometry.aileron.type}. "
+        f"Masse: {request.weight_kg}kg, Poussée: {request.thrust_N}N (T/W: {thrust_to_weight:.2f}). "
+        f"Modèle ML non encore implémenté."
+    )
 
     # Current implementation: validation only
     # Future: Call ML model and return prediction
 
     return PredictResponse(
         status="success",
-        message="Paramètres de fusée reçus et validés. Modèle ML non encore implémenté.",
+        message=summary_message,
         request_id=None
     )
