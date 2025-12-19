@@ -1,0 +1,35 @@
+{
+  "geometry": {
+    "coiffe": {
+      "shape_param": 0.5,
+      "diameter_mm": 60,
+      "length_mm": 150
+    },
+    "tube": {
+      "diameter_mm": 60,
+      "length_mm": 300
+    },
+    "aileron": {
+      "type": "trapezoidale",
+      "number": 3,
+      "inclination_deg": 0
+    }
+  },
+  "cg": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.2
+  },
+  "weight_kg": 1.5,
+  "thrust_N": 50.0,
+  "wind": {
+    "x": 0.0,
+    "y": 0.0,
+    "z": 0.0,
+    "groundSpeed_kms": 0.0
+  },
+  "ramp_inclination": {
+    "theta_xy": 0.0,
+    "phi_xz": 85.0
+  }
+}
