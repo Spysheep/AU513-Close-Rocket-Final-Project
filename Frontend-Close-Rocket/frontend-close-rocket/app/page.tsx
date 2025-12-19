@@ -38,7 +38,7 @@ const initialForm: FormData = {
     aileron: {
       type: "trapezoidale",
       number: "3",
-      trapezoid: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "10" },
+      trapezoid: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "20" },
       elliptique: { hauteur: "80", emplanture: "90", segments: "48" },
       diamant: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "15" },
     },
@@ -97,11 +97,9 @@ export default function Home() {
           aileron: {
             type: form.geometry.aileron.type,
             number: parseInt(form.geometry.aileron.number),
-            // Backend expects an inclination; derive from current fin type sweep when available
+            // Backend expects an inclination; only diamant has sweep angle now
             inclination_deg:
-              form.geometry.aileron.type === "trapezoidale"
-                ? parseFloat(form.geometry.aileron.trapezoid?.sweep_angle_deg || "0")
-                : form.geometry.aileron.type === "diamant"
+              form.geometry.aileron.type === "diamant"
                 ? parseFloat(form.geometry.aileron.diamant?.sweep_angle_deg || "0")
                 : 0,
           },
@@ -273,17 +271,6 @@ export default function Home() {
                     },
                   },
                 })} />
-                <InputNumber label="Angle de flèche (°)" value={form.geometry.aileron.trapezoid?.sweep_angle_deg || ""} onChange={(v)=>setForm({
-                  ...form,
-                  geometry: {
-                    ...form.geometry,
-                    aileron: {
-                      ...form.geometry.aileron,
-                      trapezoid: { ...(form.geometry.aileron.trapezoid||{ hauteur:"", longueur:"", emplanture:"", sweep_angle_deg:"" }), sweep_angle_deg: v },
-                    },
-                  },
-                })} />
-                <div className="text-xs text-zinc-500">Angle entre l&#39;emplanture (bas) et le bord d&#39;attaque.</div>
               </div>
             )}
 
@@ -351,16 +338,6 @@ export default function Home() {
                     aileron: {
                       ...form.geometry.aileron,
                       diamant: { ...(form.geometry.aileron.diamant||{ hauteur:"", longueur:"", emplanture:"", sweep_angle_deg:"" }), emplanture: v },
-                    },
-                  },
-                })} />
-                <InputNumber label="Angle de flèche (°)" value={form.geometry.aileron.diamant?.sweep_angle_deg || ""} onChange={(v)=>setForm({
-                  ...form,
-                  geometry: {
-                    ...form.geometry,
-                    aileron: {
-                      ...form.geometry.aileron,
-                      diamant: { ...(form.geometry.aileron.diamant||{ hauteur:"", longueur:"", emplanture:"", sweep_angle_deg:"" }), sweep_angle_deg: v },
                     },
                   },
                 })} />
