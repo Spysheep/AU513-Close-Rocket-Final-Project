@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import RocketPreview from "./components/RocketPreview";
 
 type AileronType = "trapezoidale" | "elliptique" | "diamant";
@@ -50,16 +51,54 @@ const initialForm: FormData = {
   ramp_inclination: { theta_xy: "", phi_xz: "" },
 };
 
+type TabType = "input" | "load";
+
 export default function Home() {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TabType>("input");
   const [form, setForm] = useState<FormData>(initialForm);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [result, setResult] = useState<BackendResponse | null>(null);
+  const [showLoadingPopup, setShowLoadingPopup] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  
+  // État pour l'onglet "Charger simulation"
+  const [simulationId, setSimulationId] = useState<string>("");
+  const [loadError, setLoadError] = useState<string>("");
 
   const clearForm = () => {
     setForm(initialForm);
     setError("");
     setResult(null);
+  };
+
+  // Fonction pour charger une simulation existante par ID
+  const handleLoadSimulation = () => {
+    if (!simulationId.trim()) {
+      setLoadError("Veuillez entrer un ID de simulation");
+      return;
+    }
+    
+    setLoadError("");
+    setShowLoadingPopup(true);
+    setLoadingProgress(0);
+    
+    // Animation de la barre de progression sur 3 secondes (plus court car on charge juste)
+    const totalDuration = 3000;
+    const intervalMs = 50;
+    const steps = totalDuration / intervalMs;
+    let currentStep = 0;
+    
+    const progressInterval = setInterval(() => {
+      currentStep++;
+      setLoadingProgress(Math.min((currentStep / steps) * 100, 100));
+      
+      if (currentStep >= steps) {
+        clearInterval(progressInterval);
+        router.push(`/simulation?id=${encodeURIComponent(simulationId.trim())}`);
+      }
+    }, intervalMs);
   };
 
   const validateClient = (): string | null => {
@@ -135,26 +174,93 @@ export default function Home() {
       }
       const data = await response.json();
       setResult(data);
+      
+      // Génère un ID de simulation (format rocket_XXXX)
+      const simulationId = `rocket_${String(Math.floor(Math.random() * 10000)).padStart(4, "0")}`;
+      
+      // Affiche le popup de loading
+      setShowLoadingPopup(true);
+      setLoadingProgress(0);
+      
+      // Animation de la barre de progression sur 5 secondes
+      const totalDuration = 5000; // 5 secondes
+      const intervalMs = 50;
+      const steps = totalDuration / intervalMs;
+      let currentStep = 0;
+      
+      const progressInterval = setInterval(() => {
+        currentStep++;
+        setLoadingProgress(Math.min((currentStep / steps) * 100, 100));
+        
+        if (currentStep >= steps) {
+          clearInterval(progressInterval);
+          // Redirection vers la page simulation
+          router.push(`/simulation?id=${encodeURIComponent(simulationId)}`);
+        }
+      }, intervalMs);
+      
     } catch (e: unknown) {
       setError(
         "Erreur : Impossible de se connecter au backend ou données invalides. Assurez-vous que le backend est lancé sur le port 8000."
       );
       console.error(e);
-    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black py-10">
-      <main className="mx-auto w-full max-w-6xl rounded-xl bg-white dark:bg-zinc-900 p-8 shadow">
-        <header className="mb-6 flex items-center justify-between">
-          <h1 className="text-2xl md:text-3xl font-bold text-black dark:text-white">Close Rocket — Input</h1>
-          <div className="text-xs text-zinc-500">Backend: http://localhost:8000</div>
-        </header>
+    <>
+      {/* Popup de loading */}
+      {showLoadingPopup && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div className="text-center">
+              {/* Animation fusée */}
+              <div className="relative h-32 mb-6">
+                <div 
+                  className="absolute left-1/2 -translate-x-1/2 text-6xl transition-all duration-100"
+                  style={{ bottom: `${loadingProgress * 0.8}%` }}
+                >
+                  🚀
+                </div>
+                {/* Trainée de fumée */}
+                <div 
+                  className="absolute left-1/2 -translate-x-1/2 bottom-0 w-4 bg-gradient-to-t from-orange-500 via-yellow-400 to-transparent rounded-full transition-all duration-100"
+                  style={{ height: `${Math.min(loadingProgress * 0.5, 40)}%`, opacity: loadingProgress > 5 ? 1 : 0 }}
+                />
+              </div>
+              
+              <h2 className="text-xl font-bold text-black dark:text-white mb-2">
+                Préparation de la simulation...
+              </h2>
+              <p className="text-sm text-zinc-500 mb-6">
+                Calcul de la trajectoire en cours
+              </p>
+              
+              {/* Barre de progression */}
+              <div className="w-full bg-zinc-200 dark:bg-zinc-700 rounded-full h-3 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-100"
+                  style={{ width: `${loadingProgress}%` }}
+                />
+              </div>
+              <p className="text-sm text-zinc-500 mt-2">
+                {Math.round(loadingProgress)}%
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="min-h-screen bg-zinc-50 dark:bg-black py-10">
+        <main className="mx-auto w-full max-w-6xl rounded-xl bg-white dark:bg-zinc-900 p-8 shadow">
+          <header className="mb-6 flex items-center justify-between">
+            <h1 className="text-2xl md:text-3xl font-bold text-black dark:text-white">Close Rocket — Input</h1>
+            <div className="text-xs text-zinc-500">Backend: http://localhost:8000</div>
+          </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: form (two columns width) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left: form (two columns width) */}
           <div className="lg:col-span-2">
         {/* Geometry */}
         <section>
@@ -458,6 +564,7 @@ export default function Home() {
         </div>
       </main>
     </div>
+    </>
   );
 }
 
