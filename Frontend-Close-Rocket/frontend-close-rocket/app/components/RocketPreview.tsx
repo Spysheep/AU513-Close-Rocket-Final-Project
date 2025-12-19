@@ -98,12 +98,14 @@ export default function RocketPreview({
     const xRight = centerX + bodyW / 2;
 
     // Rotate local fin geometry by ±90° so the fins stick out perpendicularly from the fuselage.
-    // Right fin: +90° (outward to the right) -> (x', y') = (-y, x)
-    // Left fin:  -90° (outward to the left)  -> (x', y') = ( y, -x)
+    // Left fin: +90° (outward to the left) -> (x', y') = (-y, x)
+    // Right fin: -90° then flip Y (outward to the right, mirrored)
     const rotatePlus90 = (p: [number, number]): [number, number] => {
       const [x, y] = p; return [-y, x];
     };
-    // Note: rotateMinus90 is no longer needed since both fins use +90° rotation and differ only by lateral translation.
+    const rotateMinus90FlipY = (p: [number, number]): [number, number] => {
+      const [x, y] = p; return [y, x]; // -90° rotation + vertical flip
+    };
 
     if (finType === "diamant") {
       // Inputs with safe fallbacks
@@ -113,19 +115,25 @@ export default function RocketPreview({
       const sweep = num(aileron.diamant?.sweep_angle_deg, 15);
 
       // Local vertices (origin at inner-bottom corner)
+      // p0=(0,0), p1=(root,0), p2=(dx+tip,h), p3=(dx,h)
       const vertsLocal = diamondFinVertices(height, tip, root, sweep);
-      const rotated = vertsLocal.map(rotatePlus90);
-      // After rotation, align bottom edge of fin with bottom of rocket body
-      // The fin's root chord (y=0 in local coords) becomes x=0 after rotation
-      // We need to align the maximum Y (which corresponds to root_chord) with yBase
-      const maxY = Math.max(...rotated.map((p) => p[1]));
-      const yOffset = yBase - maxY;
+      
+      // Left fin: rotate +90° (points outward to the left)
+      // p1 (root_chord, 0) -> (0, root_chord) should align with bottom
+      const rotatedLeft = vertsLocal.map(rotatePlus90);
+      const rootYLeft = rotatedLeft[1][1]; // p1's Y after rotation
+      const yOffsetLeft = yBase - rootYLeft;
+
+      // Right fin: rotate -90° + flip Y (points outward to the right, mirrored)
+      const rotatedRight = vertsLocal.map(rotateMinus90FlipY);
+      const rootYRight = rotatedRight[1][1]; // p1's Y after transformation
+      const yOffsetRight = yBase - rootYRight;
 
       const right = svgPathFromPoints(
-        rotated.map(([xr, yr]) => [xRight + xr, yOffset + yr] as [number, number])
+        rotatedRight.map(([xr, yr]) => [xRight + xr, yOffsetRight + yr] as [number, number])
       );
       const left = svgPathFromPoints(
-        rotated.map(([xl, yl]) => [xLeft + xl, yOffset + yl] as [number, number])
+        rotatedLeft.map(([xl, yl]) => [xLeft + xl, yOffsetLeft + yl] as [number, number])
       );
       return { left, right };
     }
@@ -136,16 +144,22 @@ export default function RocketPreview({
       const h = num(aileron.elliptique?.height, Math.max(18, bodyH * 0.18));
       const segs = Math.max(8, Math.floor(num(aileron.elliptique?.segments, 48)));
       const ptsLocal = ellipticalFinPoints(h, root, segs);
-      const rotated = ptsLocal.map(rotatePlus90);
-      // After rotation, align bottom edge of fin with bottom of rocket body
-      const maxY = Math.max(...rotated.map((p) => p[1]));
-      const yOffset = yBase - maxY;
+      
+      // Left fin: rotate +90°
+      const rotatedLeft = ptsLocal.map(rotatePlus90);
+      const maxYLeft = Math.max(...rotatedLeft.map((p) => p[1]));
+      const yOffsetLeft = yBase - maxYLeft;
+
+      // Right fin: rotate -90° + flip Y (mirrored)
+      const rotatedRight = ptsLocal.map(rotateMinus90FlipY);
+      const maxYRight = Math.max(...rotatedRight.map((p) => p[1]));
+      const yOffsetRight = yBase - maxYRight;
 
       const right = svgPathFromPoints(
-        rotated.map(([xr, yr]) => [xRight + xr, yOffset + yr] as [number, number])
+        rotatedRight.map(([xr, yr]) => [xRight + xr, yOffsetRight + yr] as [number, number])
       );
       const left = svgPathFromPoints(
-        rotated.map(([xl, yl]) => [xLeft + xl, yOffset + yl] as [number, number])
+        rotatedLeft.map(([xl, yl]) => [xLeft + xl, yOffsetLeft + yl] as [number, number])
       );
       return { left, right };
     }
@@ -156,18 +170,26 @@ export default function RocketPreview({
     const topLen = num(aileron.trapezoid?.length, Math.max(8, root * 0.6));
     const angle = num(aileron.trapezoid?.sweep_angle_deg, 10);
     const vertsLocal = trapezoidalFinVertices(h, topLen, root, angle);
-    const rotated = vertsLocal.map(rotatePlus90);
-    // After rotation, align bottom edge of fin with bottom of rocket body
-    // The fin's root chord (y=0 in local coords, from x=0 to x=root) becomes vertical after rotation
-    // maxY corresponds to the bottom of the fin that should align with yBase
-    const maxY = Math.max(...rotated.map((p) => p[1]));
-    const yOffset = yBase - maxY;
+    
+    // Left fin: rotate +90°
+    // After rotation, p1 (root_chord, 0) -> (0, root_chord) should align with bottom of rocket
+    const rotatedLeft = vertsLocal.map(rotatePlus90);
+    // The root chord edge (p0-p1) after rotation has x=0 and y from 0 to root_chord
+    // We want p1 (which becomes (0, root_chord)) to be at yBase
+    const rootYLeft = rotatedLeft[1][1]; // p1's Y after rotation
+    const yOffsetLeft = yBase - rootYLeft;
+
+    // Right fin: rotate -90° + flip Y (mirrored)
+    const rotatedRight = vertsLocal.map(rotateMinus90FlipY);
+    // Similarly, align the root chord edge with the bottom
+    const rootYRight = rotatedRight[1][1]; // p1's Y after transformation
+    const yOffsetRight = yBase - rootYRight;
 
     const right = svgPathFromPoints(
-      rotated.map(([xr, yr]) => [xRight + xr, yOffset + yr] as [number, number])
+      rotatedRight.map(([xr, yr]) => [xRight + xr, yOffsetRight + yr] as [number, number])
     );
     const left = svgPathFromPoints(
-      rotated.map(([xl, yl]) => [xLeft + xl, yOffset + yl] as [number, number])
+      rotatedLeft.map(([xl, yl]) => [xLeft + xl, yOffsetLeft + yl] as [number, number])
     );
     return { left, right };
   };
