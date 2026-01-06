@@ -53,11 +53,17 @@ class RocketCreator:
         self.environment.set_date((self.date.year, self.date.month, self.date.day, 12))
 
         # Robust Atmosphere Loading
-        try:
-            self.environment.set_atmospheric_model(type="forecast", file="GFS")
-        except Exception:
-            print("Warning: GFS forecast failed/offline. Using Standard Atmosphere.")
+        # Skip GFS download if constant wind is provided
+        if self.wind_velocity_x is not None and self.wind_velocity_y is not None:
+            print(f"Using constant wind: X={self.wind_velocity_x:.2f} m/s, Y={self.wind_velocity_y:.2f} m/s")
+            print("Skipping GFS forecast download (using constant wind instead)")
             self.environment.set_atmospheric_model(type="standard_atmosphere")
+        else:
+            try:
+                self.environment.set_atmospheric_model(type="forecast", file="GFS")
+            except Exception:
+                print("Warning: GFS forecast failed/offline. Using Standard Atmosphere.")
+                self.environment.set_atmospheric_model(type="standard_atmosphere")
 
         # Motor
         motor_loader = mc.MotorClosedRocket()
@@ -120,63 +126,66 @@ class RocketCreator:
             trigger=self.trigger,
         )
 
+        # Apply constant wind to environment before creating Flight
+        if self.wind_velocity_x is not None and self.wind_velocity_y is not None:
+            self._apply_constant_wind_to_environment(self.wind_velocity_x, self.wind_velocity_y)
+
         # Flight
         self.flight = Flight(rocket=self.rocket, environment=self.environment, rail_length=5.2,
                              inclination=self.ramp_inclinaison, heading=self.heading)
-        
-        # Apply constant wind if provided
-        if self.wind_velocity_x is not None and self.wind_velocity_y is not None:
-            print(f"Applying constant wind from initialization: X={self.wind_velocity_x:.2f} m/s, Y={self.wind_velocity_y:.2f} m/s")
-            self.set_custom_wind(self.wind_velocity_x, self.wind_velocity_y)
 
-    def set_custom_wind(self, wind_velocity_x, wind_velocity_y):
+    def _apply_constant_wind_to_environment(self, wind_velocity_x, wind_velocity_y):
         """
-        Set custom constant wind velocities, completely bypassing atmospheric model.
-        
+        Internal method to apply constant wind to the environment.
+
         Args:
             wind_velocity_x (float): Wind velocity in X (East-West) direction (m/s)
             wind_velocity_y (float): Wind velocity in Y (North-South) direction (m/s)
         """
-        print(f"Setting custom constant wind: X={wind_velocity_x:.2f} m/s, Y={wind_velocity_y:.2f} m/s")
-        
-        # Create a completely custom atmosphere with ONLY wind parameters
-        # No temperature, pressure, or other atmospheric data - just constant wind
         try:
             # Set atmospheric model to custom with only wind parameters
-            # Temperature and pressure will use defaults
             self.environment.set_atmospheric_model(
                 type="custom_atmosphere",
                 temperature=lambda h: 300,  # Constant 300K temperature
                 wind_u=lambda h: wind_velocity_x,  # Constant X wind
                 wind_v=lambda h: wind_velocity_y   # Constant Y wind
             )
-            print(f"Custom constant wind applied successfully")
+            print(f"Constant wind applied to environment successfully")
         except Exception as e:
             print(f"Error setting custom wind: {e}")
             print("Trying alternative method...")
-            
-            # Alternative: Create environment with no atmospheric model, then set wind
+
+            # Alternative: Override wind methods directly
             try:
-                # Don't set any atmospheric model - use defaults
-                # Then manually set wind attributes if they exist
                 self.environment.set_atmospheric_model(type="standard_atmosphere")
-                
-                # Override wind methods directly
                 self.environment.wind_velocity_x = lambda h: wind_velocity_x
                 self.environment.wind_velocity_y = lambda h: wind_velocity_y
                 print(f"Wind set via direct attribute override")
             except Exception as e2:
                 print(f"Error with alternative method: {e2}")
-        
+
+    def set_custom_wind(self, wind_velocity_x, wind_velocity_y):
+        """
+        Set custom constant wind velocities and recreate the flight simulation.
+
+        Args:
+            wind_velocity_x (float): Wind velocity in X (East-West) direction (m/s)
+            wind_velocity_y (float): Wind velocity in Y (North-South) direction (m/s)
+        """
+        print(f"Setting custom constant wind: X={wind_velocity_x:.2f} m/s, Y={wind_velocity_y:.2f} m/s")
+
+        # Apply wind to environment
+        self._apply_constant_wind_to_environment(wind_velocity_x, wind_velocity_y)
+
         # Recreate Flight with updated environment
         self.flight = Flight(
-            rocket=self.rocket, 
-            environment=self.environment, 
+            rocket=self.rocket,
+            environment=self.environment,
             rail_length=5.2,
-            inclination=self.ramp_inclinaison, 
+            inclination=self.ramp_inclinaison,
             heading=self.heading
         )
-        
+
         print("Flight simulation recreated with constant wind.")
     
     def get_wind_at_altitude(self, altitude=500):
