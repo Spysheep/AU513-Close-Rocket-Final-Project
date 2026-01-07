@@ -130,12 +130,23 @@ class TrajectoryPoint(BaseModel):
     wind_velocity_y: float
 
 
-class SimulationResponse(BaseModel):
-    """Model for a complete simulation response"""
-    rocket_id: str
+class SimulationData(BaseModel):
+    """Model for simulation data (rocket_parameters, trajectory, metadata)"""
     rocket_parameters: RocketParameters
     trajectory: List[TrajectoryPoint]
     metadata: Dict[str, Any]
+
+
+class SimulationResponse(BaseModel):
+    """Model for a complete simulation response - supports single source or both"""
+    rocket_id: str
+    # For source='rocketpy' or 'ml' - fields at root level
+    rocket_parameters: Optional[RocketParameters] = None
+    trajectory: Optional[List[TrajectoryPoint]] = None
+    metadata: Optional[Dict[str, Any]] = None
+    # For source='both' - nested objects
+    rocketpy: Optional[SimulationData] = None
+    ml: Optional[SimulationData] = None
 
 
 class SimulationsResponse(BaseModel):
@@ -397,22 +408,34 @@ def read_root():
 
 
 @app.get("/simulations", response_model=SimulationsResponse, tags=["Simulations"])
-async def get_simulations(ids: str = Query(..., description="Comma-separated rocket IDs (e.g., 'rocket_0000,rocket_0001')")):
+async def get_simulations(
+    ids: str = Query(..., description="Comma-separated rocket IDs (e.g., 'rocket_0000,rocket_0001')"),
+    source: str = Query("rocketpy", description="Data source: 'rocketpy', 'ml', or 'both'")
+):
     """
     Récupère une ou plusieurs simulations complètes par rocket_id
 
     Args:
         ids: IDs de fusées séparés par virgule (ex: "rocket_0000,rocket_0001")
+        source: Source des données - 'rocketpy' (défaut), 'ml', ou 'both'
 
     Returns:
         JSON complet avec tous les points de trajectoire et paramètres de fusée
 
     Raises:
-        400: Format d'ID invalide
+        400: Format d'ID invalide ou source invalide
         404: Un ou plusieurs IDs n'existent pas
         500: Erreur de connexion base de données
     """
-    logger.info(f"Fetching simulations for IDs: {ids}")
+    # Validate source parameter
+    valid_sources = ["rocketpy", "ml", "both"]
+    if source not in valid_sources:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid source: '{source}'. Must be one of {valid_sources}"
+        )
+
+    logger.info(f"Fetching simulations for IDs: {ids}, source: {source}")
 
     # Parse comma-separated IDs
     rocket_ids = [rocket_id.strip() for rocket_id in ids.split(',')]
@@ -426,11 +449,11 @@ async def get_simulations(ids: str = Query(..., description="Comma-separated roc
                 detail=f"Invalid rocket_id format: '{rocket_id}'. Expected format: rocket_XXXX"
             )
 
-    # Fetch simulations from database
+    # Fetch simulations from database based on source
     database = get_db()
-    simulations = database.get_simulations_by_ids(rocket_ids)
+    simulations = database.get_simulations_by_ids(rocket_ids, source=source)
 
-    logger.info(f"Successfully fetched {len(simulations)} simulations")
+    logger.info(f"Successfully fetched {len(simulations)} simulations from {source}")
 
     return SimulationsResponse(
         count=len(simulations),

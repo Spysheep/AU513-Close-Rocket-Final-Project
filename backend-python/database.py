@@ -114,19 +114,104 @@ class SupabaseDatabase:
             logger.error(f"Error checking rocket existence: {e}")
             raise DatabaseConnectionError(f"Database error: {e}")
 
-    def get_simulation_by_id(self, rocket_id: str) -> Optional[Dict[str, Any]]:
+    def _fetch_single_source_data(self, rocket_id: str, table_prefix: str) -> Dict[str, Any]:
+        """
+        Helper method to fetch data from a single source (rocketpy or ml inference tables)
+
+        Args:
+            rocket_id: Rocket identifier
+            table_prefix: Either '' for standard tables or '_inference' for ML tables
+
+        Returns:
+            Dictionary with rocket_parameters, trajectory, and metadata
+        """
+        rockets_table = f"rockets{table_prefix}"
+        trajectories_table = f"trajectories{table_prefix}"
+        wind_table = f"wind_conditions{table_prefix}"
+
+        # Fetch rocket parameters
+        logger.info(f"Fetching from {rockets_table} for {rocket_id}")
+        rocket_response = self.supabase.table(rockets_table).select('*').eq('rocket_id', rocket_id).execute()
+
+        if not rocket_response.data:
+            raise RocketNotFoundError(f"Rocket {rocket_id} not found in {rockets_table}")
+
+        rocket_params = rocket_response.data[0]
+
+        # Fetch trajectory data
+        trajectory_response = self.supabase.table(trajectories_table) \
+            .select('time, x, y, z') \
+            .eq('rocket_id', rocket_id) \
+            .order('time') \
+            .execute()
+
+        # Fetch wind conditions
+        wind_response = self.supabase.table(wind_table) \
+            .select('time, wind_velocity_x, wind_velocity_y') \
+            .eq('rocket_id', rocket_id) \
+            .order('time') \
+            .execute()
+
+        # Merge trajectory and wind data
+        wind_dict = {point['time']: point for point in wind_response.data}
+
+        combined_trajectory = []
+        for traj_point in trajectory_response.data:
+            time = traj_point['time']
+            wind_point = wind_dict.get(time, {'wind_velocity_x': 0.0, 'wind_velocity_y': 0.0})
+
+            combined_trajectory.append({
+                'time': time,
+                'x': traj_point['x'],
+                'y': traj_point['y'],
+                'z': traj_point['z'],
+                'wind_velocity_x': wind_point['wind_velocity_x'],
+                'wind_velocity_y': wind_point['wind_velocity_y']
+            })
+
+        metadata = self._calculate_metadata(combined_trajectory)
+
+        return {
+            'rocket_parameters': {
+                'rocket_id': rocket_params['rocket_id'],
+                'delay': rocket_params['delay'],
+                'heading': rocket_params['heading'],
+                'ramp_inclinaison': rocket_params['ramp_inclinaison'],
+                'motor_name': rocket_params['motor_name'],
+                'radius': rocket_params['radius'],
+                'mass': rocket_params['mass'],
+                'inertia': rocket_params['inertia'],
+                'center_of_mass_without_motor': rocket_params['center_of_mass_without_motor'],
+                'cone_length': rocket_params['cone_length'],
+                'rocket_length': rocket_params['rocket_length'],
+                'fin_cat': rocket_params['fin_cat'],
+                'number_of_ailerons': rocket_params['number_of_ailerons'],
+                'root_chord': rocket_params['root_chord'],
+                'tip_chord': rocket_params['tip_chord'],
+                'span': rocket_params['span'],
+                'fins_pos': rocket_params['fins_pos'],
+                'fin_inclinaison': rocket_params['fin_inclinaison'],
+                'drag_coeff': rocket_params['drag_coeff'],
+                'trigger': rocket_params['trigger'],
+                'trajectory_file': rocket_params['trajectory_file']
+            },
+            'trajectory': combined_trajectory,
+            'metadata': metadata
+        }
+
+    def get_simulation_by_id(self, rocket_id: str, source: str = "rocketpy") -> Optional[Dict[str, Any]]:
         """
         Fetch complete simulation data for a single rocket_id
 
         Args:
-            rocket_id: The rocket ID to fetch
+            rocket_id: Rocket identifier
+            source: Data source - 'rocketpy' (default), 'ml', or 'both'
 
         Returns:
             Dictionary containing:
                 - rocket_id: str
-                - rocket_parameters: dict with all 20 rocket parameters
-                - trajectory: list of trajectory points (time, x, y, z, wind_velocity_x, wind_velocity_y)
-                - metadata: dict with calculated statistics
+                - rocketpy (if source='rocketpy' or 'both'): dict with rocket_parameters, trajectory, metadata
+                - ml (if source='ml' or 'both'): dict with rocket_parameters, trajectory, metadata
 
         Raises:
             InvalidRocketIDError: If rocket_id format is invalid
@@ -138,88 +223,34 @@ class SupabaseDatabase:
             raise InvalidRocketIDError(f"Invalid rocket_id format: {rocket_id}. Expected format: rocket_XXXX")
 
         try:
-            # Fetch rocket parameters
-            logger.info(f"Fetching rocket parameters for {rocket_id}")
-            rocket_response = self.supabase.table('rockets').select('*').eq('rocket_id', rocket_id).execute()
+            result = {'rocket_id': rocket_id}
 
-            if not rocket_response.data:
-                raise RocketNotFoundError(f"Rocket {rocket_id} not found in database")
+            if source == "rocketpy":
+                data = self._fetch_single_source_data(rocket_id, '')
+                result.update(data)
+            elif source == "ml":
+                data = self._fetch_single_source_data(rocket_id, '_inference')
+                result.update(data)
+            elif source == "both":
+                try:
+                    rocketpy_data = self._fetch_single_source_data(rocket_id, '')
+                    result['rocketpy'] = rocketpy_data
+                except RocketNotFoundError:
+                    logger.warning(f"RocketPy data not found for {rocket_id}")
+                    result['rocketpy'] = None
 
-            rocket_params = rocket_response.data[0]
+                try:
+                    ml_data = self._fetch_single_source_data(rocket_id, '_inference')
+                    result['ml'] = ml_data
+                except RocketNotFoundError:
+                    logger.warning(f"ML data not found for {rocket_id}")
+                    result['ml'] = None
 
-            # Fetch trajectory data
-            logger.info(f"Fetching trajectory data for {rocket_id}")
-            trajectory_response = self.supabase.table('trajectories') \
-                .select('time, x, y, z') \
-                .eq('rocket_id', rocket_id) \
-                .order('time') \
-                .execute()
+                if result.get('rocketpy') is None and result.get('ml') is None:
+                    raise RocketNotFoundError(f"Rocket {rocket_id} not found in any table")
 
-            # Fetch wind conditions
-            logger.info(f"Fetching wind conditions for {rocket_id}")
-            wind_response = self.supabase.table('wind_conditions') \
-                .select('time, wind_velocity_x, wind_velocity_y') \
-                .eq('rocket_id', rocket_id) \
-                .order('time') \
-                .execute()
-
-            # Merge trajectory and wind data by time
-            trajectory_data = trajectory_response.data
-            wind_data = wind_response.data
-
-            # Create a dictionary for quick wind lookup by time
-            wind_dict = {point['time']: point for point in wind_data}
-
-            # Combine trajectory and wind data
-            combined_trajectory = []
-            for traj_point in trajectory_data:
-                time = traj_point['time']
-                wind_point = wind_dict.get(time, {'wind_velocity_x': 0.0, 'wind_velocity_y': 0.0})
-
-                combined_trajectory.append({
-                    'time': time,
-                    'x': traj_point['x'],
-                    'y': traj_point['y'],
-                    'z': traj_point['z'],
-                    'wind_velocity_x': wind_point['wind_velocity_x'],
-                    'wind_velocity_y': wind_point['wind_velocity_y']
-                })
-
-            # Calculate metadata
-            metadata = self._calculate_metadata(combined_trajectory)
-
-            # Build complete simulation response
-            simulation = {
-                'rocket_id': rocket_id,
-                'rocket_parameters': {
-                    'rocket_id': rocket_params['rocket_id'],
-                    'delay': rocket_params['delay'],
-                    'heading': rocket_params['heading'],
-                    'ramp_inclinaison': rocket_params['ramp_inclinaison'],
-                    'motor_name': rocket_params['motor_name'],
-                    'radius': rocket_params['radius'],
-                    'mass': rocket_params['mass'],
-                    'inertia': rocket_params['inertia'],
-                    'center_of_mass_without_motor': rocket_params['center_of_mass_without_motor'],
-                    'cone_length': rocket_params['cone_length'],
-                    'rocket_length': rocket_params['rocket_length'],
-                    'fin_cat': rocket_params['fin_cat'],
-                    'number_of_ailerons': rocket_params['number_of_ailerons'],
-                    'root_chord': rocket_params['root_chord'],
-                    'tip_chord': rocket_params['tip_chord'],
-                    'span': rocket_params['span'],
-                    'fins_pos': rocket_params['fins_pos'],
-                    'fin_inclinaison': rocket_params['fin_inclinaison'],
-                    'drag_coeff': rocket_params['drag_coeff'],
-                    'trigger': rocket_params['trigger'],
-                    'trajectory_file': rocket_params['trajectory_file']
-                },
-                'trajectory': combined_trajectory,
-                'metadata': metadata
-            }
-
-            logger.info(f"Successfully fetched simulation for {rocket_id}")
-            return simulation
+            logger.info(f"Successfully fetched simulation for {rocket_id} from {source}")
+            return result
 
         except RocketNotFoundError:
             raise
@@ -227,12 +258,13 @@ class SupabaseDatabase:
             logger.error(f"Database error fetching simulation {rocket_id}: {e}")
             raise DatabaseConnectionError(f"Database error: {e}")
 
-    def get_simulations_by_ids(self, rocket_ids: List[str]) -> List[Dict[str, Any]]:
+    def get_simulations_by_ids(self, rocket_ids: List[str], source: str = "rocketpy") -> List[Dict[str, Any]]:
         """
         Fetch multiple simulations by their rocket IDs
 
         Args:
             rocket_ids: List of rocket IDs to fetch
+            source: Data source - 'rocketpy' (default), 'ml', or 'both'
 
         Returns:
             List of simulation dictionaries
@@ -245,10 +277,10 @@ class SupabaseDatabase:
         simulations = []
 
         for rocket_id in rocket_ids:
-            simulation = self.get_simulation_by_id(rocket_id)
+            simulation = self.get_simulation_by_id(rocket_id, source=source)
             simulations.append(simulation)
 
-        logger.info(f"Successfully fetched {len(simulations)} simulations")
+        logger.info(f"Successfully fetched {len(simulations)} simulations from {source}")
         return simulations
 
     def _calculate_metadata(self, trajectory: List[Dict[str, float]]) -> Dict[str, Any]:
