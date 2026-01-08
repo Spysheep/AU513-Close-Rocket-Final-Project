@@ -8,7 +8,7 @@ import datetime
 
 
 class RocketCreator:
-    def __init__(self, delay=0, heading=220, ramp_inclinaison=85, motor_name="Pro75M1670",
+    def __init__(self, launch_position, delay=0, heading=220, ramp_inclinaison=85, motor_name="Pro75M1670",
                  radius=127 / 2000, mass=14.426, inertia=(6.321, 6.321, 0.034),
                  center_of_mass_without_motor=1, cone_length=0.558, rocket_length=2.53,
                  fin_cat="trapezoidal", number_of_ailerons=4, root_chord=0.120,
@@ -17,9 +17,9 @@ class RocketCreator:
 
         # Constants
         self.EARTH_RADIUS = 6371000
-        self.latitude_0 = 43.218436
-        self.longitude_0 = 0.047333
-        self.altitude_0 = 409
+        self.latitude_0 = launch_position[0]
+        self.longitude_0 = launch_position[1]
+        self.altitude_0 = launch_position[2]
         self.r = self.EARTH_RADIUS + self.altitude_0
 
         # Ramp & Motor info

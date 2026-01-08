@@ -507,13 +507,14 @@ async def predict_trajectory(request: PredictRequest):
     # 4. Run ML prediction
     ml_predictions, ml_time, ml_duration_ms = None, None, 0
     ml_error = None
+    launch_position=[0.0, 0.0, 460.0]
     if ML_AVAILABLE:
         try:
             ml_start = time.time()
             predictor = get_predictor()
             ml_predictions, ml_time = predictor.predict_trajectory(
                 user_inputs,
-                launch_position=[0.0, 0.0, 460.0]
+                launch_position=launch_position
             )
             ml_duration_ms = (time.time() - ml_start) * 1000
             logger.info(f"ML prediction complete: {len(ml_predictions)} points in {ml_duration_ms:.0f}ms")
@@ -530,7 +531,7 @@ async def predict_trajectory(request: PredictRequest):
     if ROCKETPY_AVAILABLE:
         try:
             sim_start = time.time()
-            rocket = RocketCreator(**user_inputs)
+            rocket = RocketCreator(launch_position, **user_inputs)
             sim_trajectory, sim_time = extract_simulation_trajectory(rocket)
             sim_duration_ms = (time.time() - sim_start) * 1000
             logger.info(f"RocketPy simulation complete: {len(sim_trajectory)} points in {sim_duration_ms:.0f}ms")
