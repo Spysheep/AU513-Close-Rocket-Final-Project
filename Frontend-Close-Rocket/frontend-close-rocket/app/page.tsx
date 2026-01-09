@@ -12,6 +12,8 @@ interface BackendResponse {
   computed?: { thrust_to_weight_ratio: number };
 }
 
+type MotorType = "Pro24-6G" | "Pro54-5G Barasinga" | "Pro75-3G" | "Pro75M1670";
+
 interface FormData {
   geometry: {
     coiffe: { shape_param: string; diameter_mm: string; length_mm: string };
@@ -28,8 +30,10 @@ interface FormData {
   cg: { x: string; y: string; z: string };
   weight_kg: string;
   thrust_N: string;
-  wind: { x: string; y: string; z: string; groundSpeed_kms: string };
+  motor_type: MotorType;
+  wind: { x: string; y: string };
   ramp_inclination: { theta_xy: string; phi_xz: string };
+  ramp_position: { longitude: string; latitude: string; altitude: string };
 }
 
 const initialForm: FormData = {
@@ -47,8 +51,10 @@ const initialForm: FormData = {
   cg: { x: "", y: "", z: "" },
   weight_kg: "",
   thrust_N: "",
-  wind: { x: "", y: "", z: "", groundSpeed_kms: "" },
+  motor_type: "Pro75M1670",
+  wind: { x: "", y: "" },
   ramp_inclination: { theta_xy: "", phi_xz: "" },
+  ramp_position: { longitude: "", latitude: "", altitude: "" },
 };
 
 type TabType = "input" | "load";
@@ -153,13 +159,17 @@ export default function Home() {
         wind: {
           x: parseFloat(form.wind.x),
           y: parseFloat(form.wind.y),
-          z: parseFloat(form.wind.z),
-          groundSpeed_kms: parseFloat(form.wind.groundSpeed_kms),
         },
         ramp_inclination: {
           theta_xy: parseFloat(form.ramp_inclination.theta_xy),
           phi_xz: parseFloat(form.ramp_inclination.phi_xz),
         },
+        ramp_position: {
+          longitude: parseFloat(form.ramp_position.longitude),
+          latitude: parseFloat(form.ramp_position.latitude),
+          altitude: parseFloat(form.ramp_position.altitude),
+        },
+        motor_type: form.motor_type,
       };
 
       const response = await fetch("http://localhost:8000/predict", {
@@ -555,6 +565,29 @@ export default function Home() {
             <InputNumber label="θ (x·y) °" value={form.ramp_inclination.theta_xy} onChange={(v)=>setForm({ ...form, ramp_inclination: { ...form.ramp_inclination, theta_xy: v } })} />
             <InputNumber label="φ (x·z) °" value={form.ramp_inclination.phi_xz} onChange={(v)=>setForm({ ...form, ramp_inclination: { ...form.ramp_inclination, phi_xz: v } })} />
           </div>
+
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="col-span-1 md:col-span-3 font-medium text-zinc-700 dark:text-zinc-300">Position de la rampe</div>
+            <InputNumber label="Longitude (°)" value={form.ramp_position.longitude} onChange={(v)=>setForm({ ...form, ramp_position: { ...form.ramp_position, longitude: v } })} />
+            <InputNumber label="Latitude (°)" value={form.ramp_position.latitude} onChange={(v)=>setForm({ ...form, ramp_position: { ...form.ramp_position, latitude: v } })} />
+            <InputNumber label="Altitude (m)" value={form.ramp_position.altitude} onChange={(v)=>setForm({ ...form, ramp_position: { ...form.ramp_position, altitude: v } })} />
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-zinc-700 dark:text-zinc-300">Type de moteur</label>
+              <select
+                value={form.motor_type}
+                onChange={(e) => setForm({ ...form, motor_type: e.target.value as MotorType })}
+                className="px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-black dark:text-white"
+              >
+                <option value="Pro24-6G">Pro24-6G</option>
+                <option value="Pro54-5G Barasinga">Pro54-5G Barasinga</option>
+                <option value="Pro75-3G">Pro75-3G</option>
+                <option value="Pro75M1670">Pro75M1670</option>
+              </select>
+            </div>
+          </div>
         </section>
 
         {/* Paramètres météo */}
@@ -562,12 +595,10 @@ export default function Home() {
           <h2 className="text-xl font-semibold text-black dark:text-white">Paramètres météo</h2>
           <hr className="my-4 border-zinc-200 dark:border-zinc-800" />
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="col-span-1 md:col-span-4 font-medium text-zinc-700 dark:text-zinc-300">Vent w (x, y, z)</div>
-            <InputNumber label="wₓ" value={form.wind.x} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, x: v } })} />
-            <InputNumber label="wᵧ" value={form.wind.y} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, y: v } })} />
-            <InputNumber label="wᶻ" value={form.wind.z} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, z: v } })} /> 
-            <InputNumber label="Vent sol (km/s)" value={form.wind.groundSpeed_kms} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, groundSpeed_kms: v } })} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="col-span-1 md:col-span-2 font-medium text-zinc-700 dark:text-zinc-300">Vent (x, y)</div>
+            <InputNumber label="wₓ (m/s)" value={form.wind.x} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, x: v } })} />
+            <InputNumber label="wᵧ (m/s)" value={form.wind.y} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, y: v } })} />
           </div>
         </section>
 
