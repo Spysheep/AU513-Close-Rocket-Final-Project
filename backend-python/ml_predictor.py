@@ -22,7 +22,7 @@ FEATURE_COLUMNS_PATH = 'models/feature_columns.save'
 DT = 0.01  # Time step in seconds (10ms)
 HISTORY_TIME = 0.3  # 0.3 seconds of history
 N_STEPS = int(HISTORY_TIME / DT)  # Number of historical steps
-PREDICTION_TIME = 350  # Total prediction duration in seconds
+PREDICTION_TIME = 135  # Total prediction duration in seconds
 PREDICTION_STEPS = int(PREDICTION_TIME / DT)
 
 # Feature columns configuration

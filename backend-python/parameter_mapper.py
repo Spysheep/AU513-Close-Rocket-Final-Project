@@ -96,8 +96,9 @@ def map_frontend_to_backend(request) -> Dict[str, any]:
         'trapezoidal'  # Default fallback
     )
 
-    # Select motor based on thrust
-    motor_name = select_motor_from_thrust(request.thrust_N)
+    # Use motor_name directly from request (user selects it in frontend)
+    # No longer derive it from thrust_N
+    motor_name = request.motor_name
 
     # Calculate derived parameters
     derived = calculate_derived_parameters(request.geometry, request.weight_kg)

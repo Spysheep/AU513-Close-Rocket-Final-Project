@@ -22,6 +22,7 @@
   },
   "weight_kg": 7.0,
   "thrust_N": 100.0,
+  "motor_name": "Pro54-5G Barasinga",
   "wind": {
     "x": 5.0,
     "y": 2.0,

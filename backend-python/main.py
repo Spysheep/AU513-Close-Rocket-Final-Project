@@ -226,6 +226,7 @@ class PredictRequest(BaseModel):
     cg: CenterOfGravity
     weight_kg: float = Field(..., gt=0, description="Weight in kg")
     thrust_N: float = Field(..., gt=0, description="Thrust in Newtons")
+    motor_name: str = Field(..., description="Motor name selected by user")
     wind: Wind
     ramp_inclination: RampInclination
 

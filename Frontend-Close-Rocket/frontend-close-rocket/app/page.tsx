@@ -25,7 +25,7 @@ interface FormData {
       diamant?: { hauteur: string; longueur: string; emplanture: string; sweep_angle_deg: string };
     };
   };
-  cg: { x: string; y: string; z: string };
+  cg: { x: string };
   weight_kg: string;
   thrust_N: string;
   motor_name: string;
@@ -36,23 +36,23 @@ interface FormData {
 
 const initialForm: FormData = {
   geometry: {
-    coiffe: { shape_param: "0.5", diameter_mm: "60", length_mm: "150" },
-    tube: { diameter_mm: "60", length_mm: "300" },
+    coiffe: { shape_param: "0.5", diameter_mm: "100", length_mm: "300" },
+    tube: { diameter_mm: "100", length_mm: "1500" },
     aileron: {
       type: "trapezoidale",
-      number: "3",
+      number: "4",
       trapezoid: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "20" },
       elliptique: { hauteur: "80", emplanture: "90", segments: "48" },
       diamant: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "15" },
     },
   },
-  cg: { x: "", y: "", z: "" },
-  weight_kg: "",
-  thrust_N: "",
-  motor_name: "Pro75-3G",
-  wind: { x: "", y: "", z: "0", groundSpeed_kms: "0" },
+  cg: { x: "0.75" },
+  weight_kg: "7.0",
+  thrust_N: "100.0",
+  motor_name: "Pro54-5G Barasinga",
+  wind: { x: "5.0", y: "2.0", z: "0.0", groundSpeed_kms: "0.0" },
   environment: { latitude: "45.0", longitude: "5.0", altitude: "0" },
-  ramp_inclination: { theta_xy: "", phi_xz: "" },
+  ramp_inclination: { theta_xy: "85.0", phi_xz: "0.0" },
 };
 
 type TabType = "input" | "load";
@@ -149,11 +149,12 @@ export default function Home() {
         },
         cg: {
           x: parseFloat(form.cg.x),
-          y: parseFloat(form.cg.y),
-          z: parseFloat(form.cg.z),
+          y: 0.0,
+          z: 0.0,
         },
         weight_kg: parseFloat(form.weight_kg),
         thrust_N: parseFloat(form.thrust_N),
+        motor_name: form.motor_name,
         wind: {
           x: parseFloat(form.wind.x),
           y: parseFloat(form.wind.y),
@@ -538,11 +539,9 @@ export default function Home() {
           <hr className="my-4 border-zinc-200 dark:border-zinc-800" />
 
           {/* CG */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="col-span-1 md:col-span-3 font-medium text-zinc-700 dark:text-zinc-300">Centre de gravité (x, y, z)</div>
-            <InputNumber label="x" value={form.cg.x} onChange={(v)=>setForm({ ...form, cg: { ...form.cg, x: v } })} />
-            <InputNumber label="y" value={form.cg.y} onChange={(v)=>setForm({ ...form, cg: { ...form.cg, y: v } })} />
-            <InputNumber label="z" value={form.cg.z} onChange={(v)=>setForm({ ...form, cg: { ...form.cg, z: v } })} />
+          <div className="grid grid-cols-1 gap-4">
+            <div className="font-medium text-zinc-700 dark:text-zinc-300">Centre de gravité (m depuis le nez)</div>
+            <InputNumber label="Position X (m)" value={form.cg.x} onChange={(v)=>setForm({ ...form, cg: { x: v } })} />
           </div>
 
           <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
