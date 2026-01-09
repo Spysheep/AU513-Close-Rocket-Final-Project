@@ -372,88 +372,64 @@ export default function SimulationPage() {
           </div>
         </section>
 
-        {/* Graphique toutes coordonnées */}
-        <section className="mb-8">
-          <h2 className="text-lg font-semibold text-black dark:text-white mb-4">
-            Toutes les coordonnées vs Temps
-          </h2>
-          <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-4" style={{ height: 350 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#444" />
-                <XAxis
-                  dataKey="t"
-                  type="number"
-                  domain={['dataMin', 'dataMax']}
-                  label={{ value: "Temps (s)", position: "bottom", offset: 0 }}
-                  stroke="#888"
-                />
-                <YAxis
-                  label={{ value: "Position (m)", angle: -90, position: "insideLeft" }}
-                  stroke="#888"
-                />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }}
-                  labelStyle={{ color: "#fff" }}
-                />
-                <Legend />
-                {!isBothMode && (
-                  <>
-                    <Line
-                      data={mlData}
-                      type="monotone"
-                      dataKey="x"
-                      name="X"
-                      stroke="#ef4444"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Line
-                      data={mlData}
-                      type="monotone"
-                      dataKey="y"
-                      name="Y"
-                      stroke="#f97316"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Line
-                      data={mlData}
-                      type="monotone"
-                      dataKey="z"
-                      name="Z"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </>
-                )}
-                {isBothMode && (
-                  <>
-                    <Line
-                      data={mlData}
-                      type="monotone"
-                      dataKey="z"
-                      name="Z (ML)"
-                      stroke="#3b82f6"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <Line
-                      data={rocketpyData}
-                      type="monotone"
-                      dataKey="z"
-                      name="Z (RocketPy)"
-                      stroke="#ef4444"
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </>
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
+        {/* Graphique toutes coordonnées - Only show for single source mode */}
+        {!isBothMode && (
+          <section className="mb-8">
+            <h2 className="text-lg font-semibold text-black dark:text-white mb-4">
+              Toutes les coordonnées vs Temps
+            </h2>
+            <div className="bg-zinc-50 dark:bg-zinc-800 rounded-lg p-4" style={{ height: 350 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+                  <XAxis
+                    dataKey="t"
+                    type="number"
+                    domain={['dataMin', 'dataMax']}
+                    label={{ value: "Temps (s)", position: "bottom", offset: 0 }}
+                    stroke="#888"
+                  />
+                  <YAxis
+                    label={{ value: "Position (m)", angle: -90, position: "insideLeft" }}
+                    stroke="#888"
+                  />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#1f1f1f", border: "1px solid #333" }}
+                    labelStyle={{ color: "#fff" }}
+                  />
+                  <Legend />
+                  <Line
+                    data={mlData}
+                    type="monotone"
+                    dataKey="x"
+                    name="X"
+                    stroke="#ef4444"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    data={mlData}
+                    type="monotone"
+                    dataKey="y"
+                    name="Y"
+                    stroke="#f97316"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                  <Line
+                    data={mlData}
+                    type="monotone"
+                    dataKey="z"
+                    name="Z"
+                    stroke="#3b82f6"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+        )}
 
         {/* Raw Data Table - Only show for single source */}
         {!isBothMode && mlData.length > 0 && (
