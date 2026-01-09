@@ -29,30 +29,30 @@ interface FormData {
   weight_kg: string;
   thrust_N: string;
   motor_name: string;
-  wind: { x: string; y: string };
+  wind: { x: string; y: string; z: string; groundSpeed_kms: string }; // Gardé pour compatibilité backend
   environment: { latitude: string; longitude: string; altitude: string };
   ramp_inclination: { theta_xy: string; phi_xz: string };
 }
 
 const initialForm: FormData = {
   geometry: {
-    coiffe: { shape_param: "0.5", diameter_mm: "100", length_mm: "300" },
-    tube: { diameter_mm: "100", length_mm: "1500" },
+    coiffe: { shape_param: "0.5", diameter_mm: "60", length_mm: "150" },
+    tube: { diameter_mm: "60", length_mm: "300" },
     aileron: {
       type: "trapezoidale",
-      number: "4",
+      number: "3",
       trapezoid: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "20" },
       elliptique: { hauteur: "80", emplanture: "90", segments: "48" },
       diamant: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "15" },
     },
   },
-  cg: { x: "0.75", y: "0", z: "0" },
-  weight_kg: "7.0",
-  thrust_N: "100.0",
+  cg: { x: "", y: "", z: "" },
+  weight_kg: "",
+  thrust_N: "",
   motor_name: "Pro75-3G",
-  wind: { x: "5.0", y: "2.0" },
+  wind: { x: "", y: "", z: "0", groundSpeed_kms: "0" },
   environment: { latitude: "45.0", longitude: "5.0", altitude: "0" },
-  ramp_inclination: { theta_xy: "85.0", phi_xz: "0.0" },
+  ramp_inclination: { theta_xy: "", phi_xz: "" },
 };
 
 type TabType = "input" | "load";
@@ -100,7 +100,7 @@ export default function Home() {
       
       if (currentStep >= steps) {
         clearInterval(progressInterval);
-        router.push(`/simulation?id=${encodeURIComponent(simulationId.trim())}`);
+        router.push(`/simulations?id=${encodeURIComponent(simulationId.trim())}`);
       }
     }, intervalMs);
   };
@@ -196,7 +196,7 @@ export default function Home() {
 
       setTimeout(() => {
         // Redirection vers la page simulation avec source=ml pour afficher uniquement la prédiction ML
-        router.push(`/simulation?id=${encodeURIComponent(rocket_id)}&source=ml`);
+        router.push(`/simulations?id=${encodeURIComponent(rocket_id)}&source=ml`);
       }, 1000);
       
     } catch (e: unknown) {

@@ -128,6 +128,7 @@ export default function SimulationPage() {
         setData(result);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Erreur lors du chargement de la simulation");
+        // Ne pas charger de données de démo - laisser data à null pour afficher l'erreur
       } finally {
         setLoading(false);
       }
@@ -137,7 +138,7 @@ export default function SimulationPage() {
   }, [simulationId, source]);
 
   const handleCompareWithRocketPy = () => {
-    router.push(`/simulation?id=${encodeURIComponent(simulationId)}&source=both`);
+    router.push(`/simulations?id=${encodeURIComponent(simulationId)}&source=both`);
   };
 
   if (loading) {
@@ -153,13 +154,13 @@ export default function SimulationPage() {
     );
   }
 
-  if (error || !data) {
+  if (!data) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-black py-10">
         <main className="mx-auto w-full max-w-6xl rounded-xl bg-white dark:bg-zinc-900 p-8 shadow">
           <div className="mb-6 p-4 rounded-md border border-red-300 bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200">
             <p className="font-medium">❌ Erreur</p>
-            <p className="text-sm mt-1">{error}</p>
+            <p className="text-sm mt-1">{error || "Données introuvables"}</p>
           </div>
           <Link
             href="/"

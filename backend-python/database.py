@@ -138,19 +138,62 @@ class SupabaseDatabase:
 
         rocket_params = rocket_response.data[0]
 
-        # Fetch trajectory data
-        trajectory_response = self.supabase.table(trajectories_table) \
-            .select('time, x, y, z') \
-            .eq('rocket_id', rocket_id) \
-            .order('time') \
-            .execute()
+        # Fetch trajectory data with pagination to bypass 1000 row limit
+        # Supabase limits to 1000 rows per page by default
+        # We fetch in batches and combine them
+        all_trajectory_data = []
+        batch_size = 1000
+        start = 0
 
-        # Fetch wind conditions
-        wind_response = self.supabase.table(wind_table) \
-            .select('time, wind_velocity_x, wind_velocity_y') \
-            .eq('rocket_id', rocket_id) \
-            .order('time') \
-            .execute()
+        while True:
+            batch_response = self.supabase.table(trajectories_table) \
+                .select('time, x, y, z') \
+                .eq('rocket_id', rocket_id) \
+                .order('time') \
+                .range(start, start + batch_size - 1) \
+                .execute()
+
+            if not batch_response.data:
+                break
+
+            all_trajectory_data.extend(batch_response.data)
+
+            # If we got less than batch_size rows, we've reached the end
+            if len(batch_response.data) < batch_size:
+                break
+
+            start += batch_size
+
+        # Create a mock response object to maintain compatibility
+        class MockResponse:
+            def __init__(self, data):
+                self.data = data
+
+        trajectory_response = MockResponse(all_trajectory_data)
+
+        # Fetch wind conditions with pagination
+        all_wind_data = []
+        start = 0
+
+        while True:
+            batch_response = self.supabase.table(wind_table) \
+                .select('time, wind_velocity_x, wind_velocity_y') \
+                .eq('rocket_id', rocket_id) \
+                .order('time') \
+                .range(start, start + batch_size - 1) \
+                .execute()
+
+            if not batch_response.data:
+                break
+
+            all_wind_data.extend(batch_response.data)
+
+            if len(batch_response.data) < batch_size:
+                break
+
+            start += batch_size
+
+        wind_response = MockResponse(all_wind_data)
 
         # Merge trajectory and wind data
         wind_dict = {point['time']: point for point in wind_response.data}
