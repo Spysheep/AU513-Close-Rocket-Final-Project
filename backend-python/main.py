@@ -505,17 +505,43 @@ async def predict_trajectory(request: PredictRequest):
             detail="Failed to generate rocket ID"
         )
 
-    # 4. Run ML prediction
+    # 4. Run RocketPy simulation first
+    sim_trajectory, sim_time, sim_duration_ms = None, None, 0
+    sim_error = None
+    launch_position=[0.0, 0.0, 460.0]
+    rocketpy_flight_duration = None
+
+    if ROCKETPY_AVAILABLE:
+        try:
+            sim_start = time.time()
+            rocket = RocketCreator(launch_position, **user_inputs)
+            sim_trajectory, sim_time = extract_simulation_trajectory(rocket)
+            sim_duration_ms = (time.time() - sim_start) * 1000
+
+            # Extract actual flight duration for ML prediction
+            if sim_time is not None and len(sim_time) > 0:
+                rocketpy_flight_duration = float(sim_time[-1])
+                logger.info(f"RocketPy simulation complete: {len(sim_trajectory)} points in {sim_duration_ms:.0f}ms, flight duration: {rocketpy_flight_duration:.1f}s")
+            else:
+                logger.info(f"RocketPy simulation complete: {len(sim_trajectory)} points in {sim_duration_ms:.0f}ms")
+        except Exception as e:
+            sim_error = str(e)
+            logger.error(f"RocketPy simulation failed: {e}")
+    else:
+        sim_error = "RocketPy not available"
+        logger.warning(sim_error)
+
+    # 5. Run ML prediction using RocketPy's flight duration (if available)
     ml_predictions, ml_time, ml_duration_ms = None, None, 0
     ml_error = None
-    launch_position=[0.0, 0.0, 460.0]
     if ML_AVAILABLE:
         try:
             ml_start = time.time()
             predictor = get_predictor()
             ml_predictions, ml_time = predictor.predict_trajectory(
                 user_inputs,
-                launch_position=launch_position
+                launch_position=launch_position,
+                prediction_time=rocketpy_flight_duration  
             )
             ml_duration_ms = (time.time() - ml_start) * 1000
             logger.info(f"ML prediction complete: {len(ml_predictions)} points in {ml_duration_ms:.0f}ms")
@@ -525,22 +551,6 @@ async def predict_trajectory(request: PredictRequest):
     else:
         ml_error = "ML predictor not available"
         logger.warning(ml_error)
-
-    # 5. Run RocketPy simulation
-    sim_trajectory, sim_time, sim_duration_ms = None, None, 0
-    sim_error = None
-    if ROCKETPY_AVAILABLE:
-        try:
-            sim_start = time.time()
-            rocket = RocketCreator(launch_position, **user_inputs)
-            sim_trajectory, sim_time = extract_simulation_trajectory(rocket)
-            sim_duration_ms = (time.time() - sim_start) * 1000
-            logger.info(f"RocketPy simulation complete: {len(sim_trajectory)} points in {sim_duration_ms:.0f}ms")
-        except Exception as e:
-            sim_error = str(e)
-            logger.error(f"RocketPy simulation failed: {e}")
-    else:
-        sim_error = "RocketPy not available"
         logger.warning(sim_error)
 
     # 6. Check if both failed

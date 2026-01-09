@@ -116,18 +116,23 @@ class MLPredictor:
 
         return X_df
 
-    def predict_trajectory(self, user_inputs: Dict, launch_position: List[float] = [0.0, 0.0, 460.0]) -> Tuple[np.ndarray, np.ndarray]:
+    def predict_trajectory(self, user_inputs: Dict, launch_position: List[float] = [0.0, 0.0, 460.0], prediction_time: Optional[float] = None) -> Tuple[np.ndarray, np.ndarray]:
         """
         Predict rocket trajectory given user inputs.
 
         Args:
             user_inputs: Dictionary containing all rocket parameters from frontend
             launch_position: Initial [x, y, z] position
+            prediction_time: Total prediction duration in seconds (overrides PREDICTION_TIME if provided)
 
         Returns:
             Tuple of (predictions, time_array) where predictions is shape (N, 3)
         """
-        logger.info("Starting trajectory prediction...")
+        # Use provided prediction_time or fall back to default PREDICTION_TIME
+        actual_prediction_time = prediction_time if prediction_time is not None else PREDICTION_TIME
+        prediction_steps = int(actual_prediction_time / DT)
+
+        logger.info(f"Starting trajectory prediction for {actual_prediction_time}s ({prediction_steps} steps)...")
 
         # Create base row with all parameters
         base_row = {
@@ -158,9 +163,9 @@ class MLPredictor:
         current_time = 0.0
         current_history_df = history_df.copy()
 
-        logger.info(f"Generating {PREDICTION_STEPS} prediction steps...")
+        logger.info(f"Generating {prediction_steps} prediction steps...")
 
-        for step in range(PREDICTION_STEPS):
+        for step in range(prediction_steps):
             # Preprocess current history
             X_processed_df = self.preprocess_input(current_history_df)
             X_scaled = self.x_scaler.transform(X_processed_df)
