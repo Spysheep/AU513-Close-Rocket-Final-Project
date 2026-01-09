@@ -28,27 +28,31 @@ interface FormData {
   cg: { x: string; y: string; z: string };
   weight_kg: string;
   thrust_N: string;
-  wind: { x: string; y: string; z: string; groundSpeed_kms: string };
+  motor_name: string;
+  wind: { x: string; y: string };
+  environment: { latitude: string; longitude: string; altitude: string };
   ramp_inclination: { theta_xy: string; phi_xz: string };
 }
 
 const initialForm: FormData = {
   geometry: {
-    coiffe: { shape_param: "0.5", diameter_mm: "60", length_mm: "150" },
-    tube: { diameter_mm: "60", length_mm: "300" },
+    coiffe: { shape_param: "0.5", diameter_mm: "100", length_mm: "300" },
+    tube: { diameter_mm: "100", length_mm: "1500" },
     aileron: {
       type: "trapezoidale",
-      number: "3",
+      number: "4",
       trapezoid: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "20" },
       elliptique: { hauteur: "80", emplanture: "90", segments: "48" },
       diamant: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "15" },
     },
   },
-  cg: { x: "", y: "", z: "" },
-  weight_kg: "",
-  thrust_N: "",
-  wind: { x: "", y: "", z: "", groundSpeed_kms: "" },
-  ramp_inclination: { theta_xy: "", phi_xz: "" },
+  cg: { x: "0.75", y: "0", z: "0" },
+  weight_kg: "7.0",
+  thrust_N: "100.0",
+  motor_name: "Pro75-3G",
+  wind: { x: "5.0", y: "2.0" },
+  environment: { latitude: "45.0", longitude: "5.0", altitude: "0" },
+  ramp_inclination: { theta_xy: "85.0", phi_xz: "0.0" },
 };
 
 type TabType = "input" | "load";
@@ -153,14 +157,18 @@ export default function Home() {
         wind: {
           x: parseFloat(form.wind.x),
           y: parseFloat(form.wind.y),
-          z: parseFloat(form.wind.z),
-          groundSpeed_kms: parseFloat(form.wind.groundSpeed_kms),
+          z: 0,
+          groundSpeed_kms: 0,
         },
         ramp_inclination: {
           theta_xy: parseFloat(form.ramp_inclination.theta_xy),
           phi_xz: parseFloat(form.ramp_inclination.phi_xz),
         },
       };
+
+      // Affiche le popup de loading AVANT le fetch (prédiction = ~3-4 minutes)
+      setShowLoadingPopup(true);
+      setLoadingProgress(0);
 
       const response = await fetch("http://localhost:8000/predict", {
         method: "POST",
@@ -169,35 +177,27 @@ export default function Home() {
       });
 
       if (!response.ok) {
+        setShowLoadingPopup(false);
         const txt = await response.text();
         throw new Error(txt || "Erreur lors de l'envoi des paramètres");
       }
       const data = await response.json();
       setResult(data);
-      
-      // Génère un ID de simulation (format rocket_XXXX)
-      const simulationId = `rocket_${String(Math.floor(Math.random() * 10000)).padStart(4, "0")}`;
-      
-      // Affiche le popup de loading
-      setShowLoadingPopup(true);
-      setLoadingProgress(0);
-      
-      // Animation de la barre de progression sur 5 secondes
-      const totalDuration = 5000; // 5 secondes
-      const intervalMs = 50;
-      const steps = totalDuration / intervalMs;
-      let currentStep = 0;
-      
-      const progressInterval = setInterval(() => {
-        currentStep++;
-        setLoadingProgress(Math.min((currentStep / steps) * 100, 100));
-        
-        if (currentStep >= steps) {
-          clearInterval(progressInterval);
-          // Redirection vers la page simulation
-          router.push(`/simulation?id=${encodeURIComponent(simulationId)}`);
-        }
-      }, intervalMs);
+
+      // Récupère le rocket_id retourné par le backend
+      const rocket_id = data.rocket_id;
+
+      if (!rocket_id) {
+        throw new Error("Le backend n'a pas retourné de rocket_id");
+      }
+
+      // Animation finale de la barre avant redirection (1 seconde)
+      setLoadingProgress(100);
+
+      setTimeout(() => {
+        // Redirection vers la page simulation avec source=ml pour afficher uniquement la prédiction ML
+        router.push(`/simulation?id=${encodeURIComponent(rocket_id)}&source=ml`);
+      }, 1000);
       
     } catch (e: unknown) {
       setError(
@@ -550,6 +550,23 @@ export default function Home() {
             <InputNumber label="Poussée (N)" value={form.thrust_N} onChange={(v)=>setForm({ ...form, thrust_N: v })} />
           </div>
 
+          {/* Sélection moteur */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm text-zinc-700 dark:text-zinc-300">Moteur</label>
+              <select
+                value={form.motor_name}
+                onChange={(e) => setForm({ ...form, motor_name: e.target.value })}
+                className="px-3 py-2 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-black dark:text-white"
+              >
+                <option value="Pro24-6G">Pro24-6G</option>
+                <option value="Pro54-5G Barasinga">Pro54-5G Barasinga</option>
+                <option value="Pro75-3G">Pro75-3G</option>
+                <option value="Pro75M1670">Pro75M1670</option>
+              </select>
+            </div>
+          </div>
+
           <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="col-span-1 md:col-span-4 font-medium text-zinc-700 dark:text-zinc-300">Inclinaison de la rampe</div>
             <InputNumber label="θ (x·y) °" value={form.ramp_inclination.theta_xy} onChange={(v)=>setForm({ ...form, ramp_inclination: { ...form.ramp_inclination, theta_xy: v } })} />
@@ -557,17 +574,22 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Paramètres météo */}
+        {/* Paramètres météo et environnement */}
         <section className="mt-8">
-          <h2 className="text-xl font-semibold text-black dark:text-white">Paramètres météo</h2>
+          <h2 className="text-xl font-semibold text-black dark:text-white">Paramètres météo et environnement</h2>
           <hr className="my-4 border-zinc-200 dark:border-zinc-800" />
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="col-span-1 md:col-span-4 font-medium text-zinc-700 dark:text-zinc-300">Vent w (x, y, z)</div>
-            <InputNumber label="wₓ" value={form.wind.x} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, x: v } })} />
-            <InputNumber label="wᵧ" value={form.wind.y} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, y: v } })} />
-            <InputNumber label="wᶻ" value={form.wind.z} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, z: v } })} /> 
-            <InputNumber label="Vent sol (km/s)" value={form.wind.groundSpeed_kms} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, groundSpeed_kms: v } })} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="col-span-1 md:col-span-2 font-medium text-zinc-700 dark:text-zinc-300">Vent (m/s)</div>
+            <InputNumber label="Vent X (m/s)" value={form.wind.x} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, x: v } })} />
+            <InputNumber label="Vent Y (m/s)" value={form.wind.y} onChange={(v)=>setForm({ ...form, wind: { ...form.wind, y: v } })} />
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="col-span-1 md:col-span-3 font-medium text-zinc-700 dark:text-zinc-300">Position de lancement</div>
+            <InputNumber label="Latitude (°)" value={form.environment.latitude} onChange={(v)=>setForm({ ...form, environment: { ...form.environment, latitude: v } })} />
+            <InputNumber label="Longitude (°)" value={form.environment.longitude} onChange={(v)=>setForm({ ...form, environment: { ...form.environment, longitude: v } })} />
+            <InputNumber label="Altitude (m)" value={form.environment.altitude} onChange={(v)=>setForm({ ...form, environment: { ...form.environment, altitude: v } })} />
           </div>
         </section>
 

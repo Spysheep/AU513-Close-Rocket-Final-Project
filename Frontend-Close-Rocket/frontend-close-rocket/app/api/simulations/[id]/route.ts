@@ -34,13 +34,44 @@ export async function GET(
     }
 
     const data = await res.json();
-    
+
     // Backend returns { count, simulations: [...] }
     // Extract the first simulation and format for frontend
     if (data.simulations && data.simulations.length > 0) {
       const sim = data.simulations[0];
+
+      // Check if source=both (backend returns rocketpy and ml objects)
+      if (sim.rocketpy && sim.ml) {
+        return Response.json({
+          id: sim.rocket_id,
+          source: "both",
+          rocketpy: {
+            trajectory: sim.rocketpy.trajectory.map((point: { time: number; x: number; y: number; z: number }) => ({
+              t: point.time,
+              x: point.x,
+              y: point.y,
+              z: point.z,
+            })),
+            parameters: sim.rocketpy.rocket_parameters,
+            metadata: sim.rocketpy.metadata,
+          },
+          ml: {
+            trajectory: sim.ml.trajectory.map((point: { time: number; x: number; y: number; z: number }) => ({
+              t: point.time,
+              x: point.x,
+              y: point.y,
+              z: point.z,
+            })),
+            parameters: sim.ml.rocket_parameters,
+            metadata: sim.ml.metadata,
+          },
+        });
+      }
+
+      // Single source (rocketpy or ml)
       return Response.json({
         id: sim.rocket_id,
+        source: incoming.searchParams.get("source") || "rocketpy",
         trajectory: sim.trajectory.map((point: { time: number; x: number; y: number; z: number }) => ({
           t: point.time,
           x: point.x,
