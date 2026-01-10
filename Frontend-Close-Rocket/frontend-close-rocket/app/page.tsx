@@ -36,23 +36,23 @@ interface FormData {
 
 const initialForm: FormData = {
   geometry: {
-    coiffe: { shape_param: "0.5", diameter_mm: "100", length_mm: "300" },
-    tube: { diameter_mm: "100", length_mm: "1500" },
+    coiffe: { shape_param: "0.5", diameter_mm: "54", length_mm: "200" },
+    tube: { diameter_mm: "54", length_mm: "900" },
     aileron: {
       type: "trapezoidale",
-      number: "4",
+      number: "3",
       trapezoid: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "20" },
       elliptique: { hauteur: "80", emplanture: "90", segments: "48" },
       diamant: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "15" },
     },
   },
-  cg: { x: "0.75" },
-  weight_kg: "7.0",
-  thrust_N: "100.0",
+  cg: { x: "0.55" },
+  weight_kg: "2.8",
+  thrust_N: "370.0",
   motor_name: "Pro54-5G Barasinga",
-  wind: { x: "5.0", y: "2.0", z: "0.0", groundSpeed_kms: "0.0" },
-  environment: { latitude: "45.0", longitude: "5.0", altitude: "0" },
-  ramp_inclination: { theta_xy: "85.0", phi_xz: "0.0" },
+  wind: { x: "3.5", y: "1.2", z: "0.0", groundSpeed_kms: "0.0" },
+  environment: { latitude: "43.7384", longitude: "7.4246", altitude: "350" },
+  ramp_inclination: { theta_xy: "84.0", phi_xz: "0.0" },
 };
 
 type TabType = "input" | "load";
@@ -164,6 +164,11 @@ export default function Home() {
         ramp_inclination: {
           theta_xy: parseFloat(form.ramp_inclination.theta_xy),
           phi_xz: parseFloat(form.ramp_inclination.phi_xz),
+        },
+        launch_position: {
+          latitude: parseFloat(form.environment.latitude),
+          longitude: parseFloat(form.environment.longitude),
+          altitude: parseFloat(form.environment.altitude),
         },
       };
 

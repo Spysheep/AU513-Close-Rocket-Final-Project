@@ -2,35 +2,40 @@
   "geometry": {
     "coiffe": {
       "shape_param": 0.5,
-      "diameter_mm": 100,
-      "length_mm": 300
+      "diameter_mm": 54,
+      "length_mm": 200
     },
     "tube": {
-      "diameter_mm": 100,
-      "length_mm": 1500
+      "diameter_mm": 54,
+      "length_mm": 900
     },
     "aileron": {
       "type": "trapezoidale",
-      "number": 4,
-      "inclination_deg": 0.0
+      "number": 3,
+      "inclination_deg": 1.0
     }
   },
   "cg": {
-    "x": 0.75,
+    "x": 0.55,
     "y": 0.0,
     "z": 0.0
   },
-  "weight_kg": 7.0,
-  "thrust_N": 100.0,
+  "weight_kg": 2.8,
+  "thrust_N": 370.0,
   "motor_name": "Pro54-5G Barasinga",
   "wind": {
-    "x": 5.0,
-    "y": 2.0,
+    "x": 3.5,
+    "y": 1.2,
     "z": 0.0,
     "groundSpeed_kms": 0.0
   },
   "ramp_inclination": {
-    "theta_xy": 85.0,
+    "theta_xy": 84.0,
     "phi_xz": 0.0
+  },
+  "launch_position": {
+    "latitude": 43.7384,
+    "longitude": 7.4246,
+    "altitude": 350.0
   }
 }

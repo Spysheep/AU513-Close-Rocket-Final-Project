@@ -220,6 +220,13 @@ class RampInclination(BaseModel):
         return v
 
 
+class LaunchPosition(BaseModel):
+    """Model for launch position"""
+    latitude: float = Field(..., description="Latitude in degrees")
+    longitude: float = Field(..., description="Longitude in degrees")
+    altitude: float = Field(..., ge=0, description="Altitude in meters")
+
+
 class PredictRequest(BaseModel):
     """Model for ML prediction request from frontend"""
     geometry: Geometry
@@ -229,6 +236,7 @@ class PredictRequest(BaseModel):
     motor_name: str = Field(..., description="Motor name selected by user")
     wind: Wind
     ramp_inclination: RampInclination
+    launch_position: LaunchPosition = Field(..., description="Launch position (latitude, longitude, altitude)")
 
 
 class MLPredictionMetrics(BaseModel):
@@ -508,7 +516,12 @@ async def predict_trajectory(request: PredictRequest):
     # 4. Run RocketPy simulation first
     sim_trajectory, sim_time, sim_duration_ms = None, None, 0
     sim_error = None
-    launch_position=[0.0, 0.0, 460.0]
+    # Use launch position from request (longitude, latitude, altitude)
+    launch_position = [
+        request.launch_position.longitude,
+        request.launch_position.latitude,
+        request.launch_position.altitude
+    ]
     rocketpy_flight_duration = None
 
     if ROCKETPY_AVAILABLE:
