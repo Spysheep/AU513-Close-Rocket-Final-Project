@@ -83,11 +83,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS configuration for frontend
+# CORS configuration for frontend (allow all origins for development)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # Must be False when using allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -202,8 +202,13 @@ class Wind(BaseModel):
     """Model for wind conditions"""
     x: float
     y: float
-    z: float
-    groundSpeed_kms: float = Field(..., description="Ground speed in km/s")
+
+
+class RampPosition(BaseModel):
+    """Model for launch ramp position"""
+    longitude: float = Field(..., description="Longitude in degrees")
+    latitude: float = Field(..., description="Latitude in degrees")
+    altitude: float = Field(..., description="Altitude in meters")
 
 
 class RampInclination(BaseModel):
@@ -226,8 +231,10 @@ class PredictRequest(BaseModel):
     cg: CenterOfGravity
     weight_kg: float = Field(..., gt=0, description="Weight in kg")
     thrust_N: float = Field(..., gt=0, description="Thrust in Newtons")
+    motor_type: str = Field(..., description="Motor type: Pro24-6G, Pro54-5G Barasinga, Pro75-3G, or Pro75M1670")
     wind: Wind
     ramp_inclination: RampInclination
+    ramp_position: RampPosition
 
 
 class MLPredictionMetrics(BaseModel):
@@ -507,7 +514,8 @@ async def predict_trajectory(request: PredictRequest):
     # 4. Run ML prediction
     ml_predictions, ml_time, ml_duration_ms = None, None, 0
     ml_error = None
-    launch_position=[0.0, 0.0, 460.0]
+    # Get launch position from user inputs (mapped from ramp_position)
+    launch_position = user_inputs.get('launch_position', [0.0, 0.0, 460.0])
     if ML_AVAILABLE:
         try:
             ml_start = time.time()
@@ -531,13 +539,17 @@ async def predict_trajectory(request: PredictRequest):
     if ROCKETPY_AVAILABLE:
         try:
             sim_start = time.time()
-            rocket = RocketCreator(launch_position, **user_inputs)
+            # Extract launch_position from user_inputs and pass separately
+            rocket_params = {k: v for k, v in user_inputs.items() if k != 'launch_position'}
+            rocket = RocketCreator(launch_position, **rocket_params)
             sim_trajectory, sim_time = extract_simulation_trajectory(rocket)
             sim_duration_ms = (time.time() - sim_start) * 1000
             logger.info(f"RocketPy simulation complete: {len(sim_trajectory)} points in {sim_duration_ms:.0f}ms")
         except Exception as e:
             sim_error = str(e)
             logger.error(f"RocketPy simulation failed: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
     else:
         sim_error = "RocketPy not available"
         logger.warning(sim_error)

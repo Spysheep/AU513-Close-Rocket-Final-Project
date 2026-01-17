@@ -138,11 +138,12 @@ class SupabaseDatabase:
 
         rocket_params = rocket_response.data[0]
 
-        # Fetch trajectory data
+        # Fetch trajectory data - use high limit to get all points (default is 1000)
         trajectory_response = self.supabase.table(trajectories_table) \
             .select('time, x, y, z') \
             .eq('rocket_id', rocket_id) \
             .order('time') \
+            .limit(50000) \
             .execute()
 
         # Fetch wind conditions
@@ -150,6 +151,7 @@ class SupabaseDatabase:
             .select('time, wind_velocity_x, wind_velocity_y') \
             .eq('rocket_id', rocket_id) \
             .order('time') \
+            .limit(50000) \
             .execute()
 
         # Merge trajectory and wind data
@@ -320,7 +322,7 @@ class SupabaseDatabase:
     def get_next_rocket_id(self) -> str:
         """
         Get the next available rocket_id by finding the highest existing ID
-        and incrementing it.
+        across both rockets and rockets_inference tables, then incrementing it.
 
         Returns:
             str: Next rocket_id in format 'rocket_XXXX' (e.g., 'rocket_1000')
@@ -329,22 +331,26 @@ class SupabaseDatabase:
             DatabaseConnectionError: If database query fails
         """
         try:
-            # Query to get the highest rocket_id
-            result = self.supabase.table('rockets').select('rocket_id').order('rocket_id', desc=True).limit(1).execute()
-
-            if result.data and len(result.data) > 0:
-                last_rocket_id = result.data[0]['rocket_id']
-                # Extract number from 'rocket_XXXX' format
-                match = re.match(r'rocket_(\d+)', last_rocket_id)
-                if match:
-                    last_number = int(match.group(1))
-                    next_number = last_number + 1
-                    return f"rocket_{next_number:04d}"
-                else:
-                    logger.warning(f"Unexpected rocket_id format: {last_rocket_id}, defaulting to rocket_1000")
-                    return "rocket_1000"
+            max_number = -1
+            
+            # Check both tables for the highest rocket_id
+            for table_name in ['rockets', 'rockets_inference']:
+                try:
+                    result = self.supabase.table(table_name).select('rocket_id').order('rocket_id', desc=True).limit(1).execute()
+                    if result.data and len(result.data) > 0:
+                        last_rocket_id = result.data[0]['rocket_id']
+                        match = re.match(r'rocket_(\d+)', last_rocket_id)
+                        if match:
+                            number = int(match.group(1))
+                            max_number = max(max_number, number)
+                except Exception as e:
+                    logger.warning(f"Could not query {table_name}: {e}")
+            
+            if max_number >= 0:
+                next_number = max_number + 1
+                return f"rocket_{next_number:04d}"
             else:
-                # No rockets in database yet, start from rocket_0000
+                # No rockets in either table, start from rocket_0000
                 logger.info("No rockets found in database, starting from rocket_0000")
                 return "rocket_0000"
 
@@ -403,30 +409,39 @@ class SupabaseDatabase:
             self.supabase.table('rockets_inference').insert(rocket_record).execute()
             logger.info(f"Inserted rocket_inference record for {rocket_id}")
 
-            # 2. Batch insert trajectories (chunk by 1000 points)
+            # 2. Resample trajectory data to 1s intervals for storage
+            # ML generates at dt=0.01s (~17850 points), we resample to 1s (~180 points)
+            max_time = float(ml_time[-1])
+            # Create time points at 1s intervals from 0 to max_time
+            target_times = np.arange(0, max_time + 1, 1.0)
+            
+            # Interpolate x, y, z at target times
+            x_interp = np.interp(target_times, ml_time, ml_predictions[:, 0])
+            y_interp = np.interp(target_times, ml_time, ml_predictions[:, 1])
+            z_interp = np.interp(target_times, ml_time, ml_predictions[:, 2])
+            
             trajectory_records = []
-            for i, t in enumerate(ml_time):
+            for i in range(len(target_times)):
                 trajectory_records.append({
                     'rocket_id': rocket_id,
-                    'time': float(t),
-                    'x': float(ml_predictions[i, 0]),
-                    'y': float(ml_predictions[i, 1]),
-                    'z': float(ml_predictions[i, 2])
+                    'time': float(target_times[i]),
+                    'x': float(x_interp[i]),
+                    'y': float(y_interp[i]),
+                    'z': float(z_interp[i])
                 })
+            
+            logger.info(f"Resampled ML trajectory from {len(ml_time)} to {len(trajectory_records)} points (1s intervals)")
 
-            # Insert in chunks of 1000
-            chunk_size = 1000
-            for i in range(0, len(trajectory_records), chunk_size):
-                chunk = trajectory_records[i:i+chunk_size]
-                self.supabase.table('trajectories_inference').insert(chunk).execute()
-                logger.info(f"Inserted trajectory chunk {i//chunk_size + 1} for {rocket_id}")
+            # Insert all at once (should be ~180 points max)
+            self.supabase.table('trajectories_inference').insert(trajectory_records).execute()
+            logger.info(f"Inserted {len(trajectory_records)} trajectory points for {rocket_id}")
 
-            # 3. Wind conditions (constant for ML prediction)
+            # 3. Wind conditions (same 1s intervals as trajectory)
             wind_records = []
             wind_x = params.get('wind_velocity_x', 0.0)
             wind_y = params.get('wind_velocity_y', 0.0)
 
-            for t in ml_time:
+            for t in target_times:
                 wind_records.append({
                     'rocket_id': rocket_id,
                     'time': float(t),
@@ -434,10 +449,8 @@ class SupabaseDatabase:
                     'wind_velocity_y': float(wind_y)
                 })
 
-            # Insert wind conditions in chunks
-            for i in range(0, len(wind_records), chunk_size):
-                chunk = wind_records[i:i+chunk_size]
-                self.supabase.table('wind_conditions_inference').insert(chunk).execute()
+            # Insert all wind conditions at once
+            self.supabase.table('wind_conditions_inference').insert(wind_records).execute()
 
             logger.info(f"Successfully saved ML inference for {rocket_id}")
 
@@ -495,30 +508,41 @@ class SupabaseDatabase:
             self.supabase.table('rockets').insert(rocket_record).execute()
             logger.info(f"Inserted rocket record for {rocket_id}")
 
-            # 2. Batch insert trajectories
+            # 2. Resample trajectory data to 1s intervals for storage
+            # RocketPy has variable time steps, so we interpolate to get consistent 1s intervals
+            import numpy as np
+            
+            max_time = float(sim_time[-1])
+            # Create time points at 1s intervals from 0 to max_time
+            target_times = np.arange(0, max_time + 1, 1.0)
+            
+            # Interpolate x, y, z at target times
+            x_interp = np.interp(target_times, sim_time, sim_trajectory[:, 0])
+            y_interp = np.interp(target_times, sim_time, sim_trajectory[:, 1])
+            z_interp = np.interp(target_times, sim_time, sim_trajectory[:, 2])
+            
             trajectory_records = []
-            for i, t in enumerate(sim_time):
+            for i in range(len(target_times)):
                 trajectory_records.append({
                     'rocket_id': rocket_id,
-                    'time': float(t),
-                    'x': float(sim_trajectory[i, 0]),
-                    'y': float(sim_trajectory[i, 1]),
-                    'z': float(sim_trajectory[i, 2])
+                    'time': float(target_times[i]),
+                    'x': float(x_interp[i]),
+                    'y': float(y_interp[i]),
+                    'z': float(z_interp[i])
                 })
+            
+            logger.info(f"Resampled RocketPy trajectory from {len(sim_time)} to {len(trajectory_records)} points (1s intervals)")
 
-            # Insert in chunks of 1000
-            chunk_size = 1000
-            for i in range(0, len(trajectory_records), chunk_size):
-                chunk = trajectory_records[i:i+chunk_size]
-                self.supabase.table('trajectories').insert(chunk).execute()
-                logger.info(f"Inserted trajectory chunk {i//chunk_size + 1} for {rocket_id}")
+            # Insert all at once (should be ~100-200 points max)
+            self.supabase.table('trajectories').insert(trajectory_records).execute()
+            logger.info(f"Inserted {len(trajectory_records)} trajectory points for {rocket_id}")
 
-            # 3. Wind conditions
+            # 3. Wind conditions (same 1s intervals as trajectory)
             wind_records = []
             wind_x = params.get('wind_velocity_x', 0.0)
             wind_y = params.get('wind_velocity_y', 0.0)
 
-            for t in sim_time:
+            for t in target_times:
                 wind_records.append({
                     'rocket_id': rocket_id,
                     'time': float(t),
@@ -526,10 +550,8 @@ class SupabaseDatabase:
                     'wind_velocity_y': float(wind_y)
                 })
 
-            # Insert wind conditions in chunks
-            for i in range(0, len(wind_records), chunk_size):
-                chunk = wind_records[i:i+chunk_size]
-                self.supabase.table('wind_conditions').insert(chunk).execute()
+            # Insert all wind conditions at once
+            self.supabase.table('wind_conditions').insert(wind_records).execute()
 
             logger.info(f"Successfully saved RocketPy simulation for {rocket_id}")
 

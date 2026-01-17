@@ -7,24 +7,21 @@ from typing import Dict, Tuple
 from pydantic import BaseModel
 
 
-def select_motor_from_thrust(thrust_N: float) -> str:
+def validate_motor_type(motor_type: str) -> str:
     """
-    Select appropriate motor based on thrust requirement.
+    Validate and return the motor type.
 
     Args:
-        thrust_N (float): Required thrust in Newtons
+        motor_type (str): Motor type from frontend
 
     Returns:
-        str: Motor name compatible with RocketCreator
+        str: Validated motor name compatible with RocketCreator
     """
-    if thrust_N < 30:
-        return "Pro24-6G"
-    elif thrust_N < 80:
-        return "Pro54-5G Barasinga"
-    elif thrust_N < 150:
-        return "Pro75-3G"
-    else:
-        return "Pro75M1670"
+    valid_motors = ["Pro24-6G", "Pro54-5G Barasinga", "Pro75-3G", "Pro75M1670"]
+    if motor_type in valid_motors:
+        return motor_type
+    # Fallback to default if invalid
+    return "Pro75M1670"
 
 
 def calculate_derived_parameters(geometry, mass: float) -> Dict[str, any]:
@@ -96,8 +93,16 @@ def map_frontend_to_backend(request) -> Dict[str, any]:
         'trapezoidal'  # Default fallback
     )
 
-    # Select motor based on thrust
-    motor_name = select_motor_from_thrust(request.thrust_N)
+    # Use the motor type selected by user
+    motor_name = validate_motor_type(request.motor_type)
+
+    # Get launch position from ramp_position
+    # Order: [latitude, longitude, altitude] - matches RocketCreator expected format
+    launch_position = [
+        request.ramp_position.latitude,
+        request.ramp_position.longitude,
+        request.ramp_position.altitude
+    ]
 
     # Calculate derived parameters
     derived = calculate_derived_parameters(request.geometry, request.weight_kg)
@@ -112,6 +117,9 @@ def map_frontend_to_backend(request) -> Dict[str, any]:
         # Orientation and launch
         'heading': request.ramp_inclination.phi_xz,
         'ramp_inclinaison': request.ramp_inclination.theta_xy,
+
+        # Launch position
+        'launch_position': launch_position,
 
         # Wind conditions
         'wind_velocity_x': request.wind.x,

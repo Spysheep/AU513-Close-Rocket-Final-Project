@@ -48,13 +48,13 @@ const initialForm: FormData = {
       diamant: { hauteur: "80", longueur: "60", emplanture: "90", sweep_angle_deg: "15" },
     },
   },
-  cg: { x: "", y: "", z: "" },
-  weight_kg: "",
-  thrust_N: "",
+  cg: { x: "0", y: "0", z: "0.5" },
+  weight_kg: "8.5",
+  thrust_N: "1500",
   motor_type: "Pro75M1670",
-  wind: { x: "", y: "" },
-  ramp_inclination: { theta_xy: "", phi_xz: "" },
-  ramp_position: { longitude: "", latitude: "", altitude: "" },
+  wind: { x: "2", y: "1" },
+  ramp_inclination: { theta_xy: "5", phi_xz: "45" },
+  ramp_position: { longitude: "-47.9", latitude: "-22.0", altitude: "460" },
 };
 
 type TabType = "input" | "load";
@@ -185,15 +185,19 @@ export default function Home() {
       const data = await response.json();
       setResult(data);
       
-      // Génère un ID de simulation (format rocket_XXXX)
-      const simulationId = `rocket_${String(Math.floor(Math.random() * 10000)).padStart(4, "0")}`;
+      // Utilise le rocket_id retourné par le backend
+      const rocketId = data.rocket_id;
+      
+      if (!rocketId) {
+        throw new Error("Le backend n'a pas retourné de rocket_id");
+      }
       
       // Affiche le popup de loading
       setShowLoadingPopup(true);
       setLoadingProgress(0);
       
-      // Animation de la barre de progression sur 5 secondes
-      const totalDuration = 5000; // 5 secondes
+      // Animation de la barre de progression sur 2 secondes (le backend a déjà fait le calcul)
+      const totalDuration = 2000;
       const intervalMs = 50;
       const steps = totalDuration / intervalMs;
       let currentStep = 0;
@@ -204,8 +208,8 @@ export default function Home() {
         
         if (currentStep >= steps) {
           clearInterval(progressInterval);
-          // Redirection vers la page simulation
-          router.push(`/simulation?id=${encodeURIComponent(simulationId)}`);
+          // Redirection vers la page simulation avec l'ID du backend
+          router.push(`/simulation?id=${encodeURIComponent(rocketId)}`);
         }
       }, intervalMs);
       
